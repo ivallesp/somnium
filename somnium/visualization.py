@@ -3,6 +3,7 @@ from collections import Counter
 import logging
 import itertools
 import numpy as np
+from scipy import signal
 from matplotlib import cm, pyplot as plt
 from matplotlib.collections import RegularPolyCollection
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -140,3 +141,38 @@ def plot_bmus(model, figure_width=20):
     plot_map(mp, shape=subplots_shape, colormap=plt.cm.winter, fig=fig, lattice=model.codebook.lattice.name,
              mode="size")
     plt.show()
+
+
+def plot_umatrix(model, colormap=plt.cm.hot, figure_width=20):
+    codebook = model.codebook.matrix.reshape(model.codebook.n_rows, model.codebook.n_columns, -1)
+    if model.codebook.lattice.name == "rect":
+        umat = calculate_umatrix_rect(codebook)
+    elif model.codebook.lattice.name == "hexa":
+        raise NotImplementedError
+    subplot_cols = 1
+    subplot_rows = 1
+    subplots_shape = (subplot_rows, subplot_cols)
+    aspect_ratio = umat.shape[1] / umat.shape[0]
+    xinch = figure_width
+    comp_width = (figure_width / subplot_cols)
+    yinch = comp_width * aspect_ratio * subplot_rows
+    figsize = (xinch, yinch)
+    fig = plt.figure(figsize=figsize, dpi=72.)
+    plot_map(umat, shape=subplots_shape, colormap=colormap, fig=fig, lattice=model.codebook.lattice.name,
+             mode="color")
+    plt.show()
+
+
+def calculate_umatrix_rect(codebook):
+    UMatrix = np.zeros((codebook.shape[0] + codebook.shape[0] - 1, codebook.shape[1] + codebook.shape[1] - 1))
+    rows_dist = np.sqrt(((codebook[:-1, :, :] - codebook[1:, :, :]) ** 2).sum(axis=-1))  # Shift rows
+    cols_dist = np.sqrt(((codebook[:, :-1, :] - codebook[:, 1:, :]) ** 2).sum(axis=-1))  # Shift columns
+    UMatrix[1::2, ::2] = rows_dist  # Alternately insert
+    UMatrix[::2, 1::2] = cols_dist  # Alternately insert
+    kernel = np.array([[0, 1, 0],   # Kernel to fill the gaps with sum of neighbors
+                       [1, 0, 1],
+                       [0, 1, 0]])
+    out = signal.convolve2d(UMatrix, kernel, boundary='fill', mode='same')
+    out = out / signal.convolve2d(np.ones_like(UMatrix), kernel, boundary='fill', mode='same')
+    UMatrix = UMatrix + out
+    return UMatrix
