@@ -11,9 +11,8 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 def create_hexa_grid_coordinates(x, y):
     coordinates = [x for row in -1 * np.array(list(range(x))) for x in
-                   list(zip(np.arange(((row) % 2) * 0.5, y + ((row) % 2) * 0.5), [np.sqrt(3) / 2 * (row)] * y))]
+                   list(zip(np.arange(((row) % 2) * -0.5 + 1,  y + ((row) % 2) * -0.5 + 1), [np.sqrt(3) / 2 * (row)] * y))]
     return np.array(list(reversed(coordinates)))
-
 
 def create_rect_grid_coordinates(x, y):
     coordinates = list(itertools.product(range(0, -x, -1), range(y)))
@@ -26,7 +25,7 @@ def plot_map(d_matrix,
              shape=[1, 1],
              comp_width=5,
              hex_shrink=1.0,
-             lattice="hex",
+             lattice="hexa",
              mode="color",
              fig=None):
     """
@@ -44,6 +43,7 @@ def plot_map(d_matrix,
     mpl_logger = logging.getLogger('matplotlib')
     mpl_logger.setLevel(logging.WARNING)
     d_matrix = np.flip(d_matrix, axis=0)
+    d_matrix = np.flip(d_matrix, axis=1)
     d_matrix = np.expand_dims(d_matrix, 2) if d_matrix.ndim < 3 else d_matrix
     titles = [""] * d_matrix.shape[2] if len(titles) != d_matrix.shape[2] else titles
 
