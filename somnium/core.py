@@ -40,7 +40,7 @@ def find_bmu(codebook, input_matrix, metric, njb=1, nth=1):
     """
     dlen = input_matrix.shape[0]
     njb = cpu_count() if njb == -1 else njb
-    chunks = list(batching([input_matrix], n=dlen // njb, return_incomplete_batches=True))[0]
+    chunks = list(batching([input_matrix], n=dlen // njb, return_incomplete_batches=True))
 
     with Pool(njb) as pool:
         bmus = pool.map(lambda chk: _chunk_based_bmu_find(input_matrix=chk,
@@ -91,6 +91,8 @@ def update_codebook_voronoi(codebook, training_data, bmu, neighborhood, _dlen):
 
 
 def _chunk_based_bmu_find(input_matrix, codebook, metric, nth=1):
+    assert len(input_matrix) == 1
+    input_matrix = input_matrix[0]
     dlen = input_matrix.shape[0]
     bmu = np.empty((dlen, 2))
     d = sp.spatial.distance.cdist(codebook, input_matrix, metric=metric)
@@ -161,12 +163,12 @@ def train_som(data, codebook, epochs, radiusin, radiusfin, neighborhood_f, dista
 
 class SOM:
     def __init__(self, neighborhood="gaussian", normalization="var", mapsize=(15, 10), lattice="hexa",
-                 distance_metric="euclidean"):
+                 distance_metric="euclidean", n_jobs=1):
         self.neighborhood_calculator = NeighborhoodFactory.build(neighborhood)
         self.normalizer = NormalizerFactory.build(normalization)
         self.codebook = Codebook(mapsize=mapsize, lattice=lattice, distance_metric=distance_metric)
         self.distance_matrix = self.codebook.lattice.distances.reshape(self.codebook.nnodes, self.codebook.nnodes)
-
+        self.n_jobs = n_jobs
         self.model_is_unfitted = True
         self.bmu = None
 
@@ -180,7 +182,7 @@ class SOM:
                              neighborhood_f=self.neighborhood_calculator,
                              distance_matrix=self.distance_matrix,
                              distance_metric=self.codebook.lattice.distance_metric,
-                             n_jobs=1)
+                             n_jobs=self.n_jobs)
         return self
 
     def calculate_quantization_error(self):
