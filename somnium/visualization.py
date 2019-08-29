@@ -148,7 +148,7 @@ def plot_umatrix(model, colormap=plt.cm.hot, figure_width=20):
     if model.codebook.lattice.name == "rect":
         umat = calculate_umatrix_rect(codebook)
     elif model.codebook.lattice.name == "hexa":
-        raise NotImplementedError
+        umat = calculate_umatrix_hexa(codebook)
     subplot_cols = 1
     subplot_rows = 1
     subplots_shape = (subplot_rows, subplot_cols)
@@ -175,4 +175,75 @@ def calculate_umatrix_rect(codebook):
     out = signal.convolve2d(UMatrix, kernel, boundary='fill', mode='same')
     out = out / signal.convolve2d(np.ones_like(UMatrix), kernel, boundary='fill', mode='same')
     UMatrix = UMatrix + out
+    return UMatrix
+
+
+def calculate_umatrix_hexa(codebook):
+    UMatrix = np.zeros((codebook.shape[0] + codebook.shape[0] - 1, codebook.shape[1] + codebook.shape[1]))
+    # Mark neurons
+    UMatrix[::4,1::2] = -3
+    UMatrix[2::4,::2] = -3
+
+    # Diagonal lefts
+    diag_left_odd = np.sqrt(
+        ((codebook[::2, ][(((codebook.shape[0] % 2 != 0) + 0)):] - codebook[1::2, ]) ** 2).sum(axis=-1))
+    diag_left_even = np.sqrt(((codebook[1:-1:2,1:] - codebook[2::2,:-1])**2).sum(axis=-1))
+    diag_left_even = np.column_stack([np.zeros([diag_left_even.shape[0], 1]), diag_left_even])
+    UMatrix[3::4,::2] = diag_left_even
+    UMatrix[1::4,1::2] = diag_left_odd
+
+    # Diagonal right
+    diag_right_odd = np.sqrt(
+        ((codebook[::2, :-1][(((codebook.shape[0] % 2 != 0) + 0)):] - codebook[1::2, 1:]) ** 2).sum(axis=-1))
+    diag_right_odd = np.column_stack([np.zeros([diag_right_odd.shape[0], 1]), diag_right_odd])
+    diag_right_even = np.sqrt(((codebook[1:-1:2] - codebook[2::2])**2).sum(axis=-1))
+    UMatrix[1::4,::2] = diag_right_odd
+    UMatrix[3::4,1::2] = diag_right_even
+
+    # Sides
+    sides =  np.sqrt(((codebook[:,1:] - codebook[:,:-1])**2).sum(axis=-1))
+    sides = np.array([[0.0] + x.tolist() if (i%2 == 0) else x.tolist()+[0.0] for i,x in enumerate(sides)])
+    UMatrix[::4,::2] = sides[::2]
+    UMatrix[2::4,1::2] = sides[1::2]
+
+    # Odds conv
+    kernel = np.array([[1, 1, 0],   # Kernel to fill the gaps with sum of neighbors
+                       [1, 0, 1],
+                       [1, 1, 0]])
+    out = signal.convolve2d(UMatrix, kernel, boundary='fill', mode='same')
+    count_mat = np.ones_like(UMatrix)
+    count_mat[UMatrix==0]=0
+    out = out / signal.convolve2d(count_mat, kernel, boundary='fill', mode='same')
+    UMatrix[::4, 1::2] = out[::4, 1::2]
+
+    # Evens conv
+    kernel = np.array([[0, 1, 1],   # Kernel to fill the gaps with sum of neighbors
+                       [1, 0, 1],
+                       [0, 1, 1]])
+    out = signal.convolve2d(UMatrix, kernel, boundary='fill', mode='same')
+    count_mat = np.ones_like(UMatrix)
+    count_mat[UMatrix==0]=0
+    out = out / signal.convolve2d(count_mat, kernel, boundary='fill', mode='same')
+    UMatrix[2::4, ::2] = out[2::4, ::2]
+
+    # Filling the voids #0
+    kernel = np.array([[0, 1, 1],   # Kernel to fill the gaps with sum of neighbors
+                       [1, 0, 1],
+                       [0, 1, 1]])
+    out = signal.convolve2d(UMatrix, kernel, boundary='fill', mode='same')
+    count_mat = np.ones_like(UMatrix)
+    count_mat[UMatrix==0]=0
+    out = out / signal.convolve2d(count_mat, kernel, boundary='fill', mode='same')
+    UMatrix[::2, 0][::2] = out[::2, 0][::2]
+    UMatrix[2::4,-1] = out[2::4,-1]
+
+    # Filling the voids #1
+    kernel = np.array([[1, 1, 0],   # Kernel to fill the gaps with sum of neighbors
+                       [1, 0, 1],
+                       [1, 1, 0]])
+    out = signal.convolve2d(UMatrix, kernel, boundary='fill', mode='same')
+    count_mat = np.ones_like(UMatrix)
+    count_mat[UMatrix==0]=0
+    out = out / signal.convolve2d(count_mat, kernel, boundary='fill', mode='same')
+    UMatrix[1::2, 0] = out[1::2, 0]
     return UMatrix
