@@ -101,37 +101,9 @@ def _chunk_based_bmu_find(input_matrix, codebook, metric, nth=1):
     return bmu
 
 
-def _chunk_based_bmu_find_old(input_matrix, codebook, y2, nth=1):
-    """
-    Finds the corresponding bmus to the input matrix computing euclidean distance
-
-    d = (x - y)**2 = x**2 + y**2 -2xy where x**2 has been omitted because the
-    ultimate goal of the function is to find where the minimum is, not the exact
-    value of the euclidean distance. As X is constant, it does not change where the
-    minimum value lays
-
-    :param input_matrix: a matrix of input data, representing input vector as
-                         rows, and vectors features/dimention as cols
-                         when parallelizing the search, the input_matrix can be
-                         a sub matrix from the bigger matrix
-    :param codebook: matrix of weights to be used for the bmu search
-    :param y2: y squared
-    """
-    dlen = input_matrix.shape[0]
-    nnodes = codebook.shape[0]
-    bmu = np.empty((dlen, 2))
-    d = (np.dot(codebook, input_matrix.T)) * -2  # - 2xy
-    d += y2.reshape(nnodes, 1)  # + y**2
-    bmu[:, 0] = np.argpartition(d, nth, axis=0)[nth - 1]  # BMU index
-    bmu[:, 1] = np.partition(d, nth, axis=0)[nth - 1]  # Distance (without the X contribution)
-    1 / 0
-    return bmu
-
-
 def bmu_ind_to_xy(bmu_ind, codebook):
     """
-    Translates a best matching unit index to the corresponding
-    matrix x,y coordinates for the rectangular lattice
+    Translates a best matching unit index to the corresponding matrix x,y coordinates for the rectangular lattice
 
     :param bmu_ind: node index of the best matching unit
         (number of node from top left node)
@@ -162,8 +134,22 @@ def train_som(data, codebook, epochs, radiusin, radiusfin, neighborhood_f, dista
 
 
 class SOM:
-    def __init__(self, neighborhood="gaussian", normalization="var", mapsize=(15, 10), lattice="hexa",
+    def __init__(self, neighborhood="gaussian", normalization="standard", mapsize=(15, 10), lattice="hexa",
                  distance_metric="euclidean", n_jobs=1):
+        """
+        :param neighborhood: neighborhood function to use in the planar lattice. Supported functions are: 'gaussian'
+        (default), 'bubble', 'cut_gaussian' and 'epanechicov'. (str)
+        :param normalization: technique to use for normalization. Supported methods are: 'standard' (default), 'minmax',
+        'boxcox', 'logistic'. (str)
+        :param mapsize: size of the component matrices (tuple or iterable)
+        :param lattice: type of lattice: 'rect' or 'hexa' for rectangular and hexagonal lattices (str).
+        :param distance_metric: distance metric to be used in all the operations (str). The supported distance metrics
+        are the same ones as the supported by scipy: 'braycurtis', 'canberra', 'chebyshev', 'cityblock', 'correlation',
+        'cosine', 'euclidean', 'jensenshannon', 'mahalanobis', 'minkowski', 'seuclidean', 'sqeuclidean' and
+        'wminkowski'. More information here: https://docs.scipy.org/doc/scipy/reference/spatial.distance.html
+        :param n_jobs: number of jobs to use for run the algorithm. Parallelization done when finding the BMUs, using
+        multiprocessing library.
+        """
         self.neighborhood_calculator = NeighborhoodFactory.build(neighborhood)
         self.normalizer = NormalizerFactory.build(normalization)
         self.codebook = Codebook(mapsize=mapsize, lattice=lattice, distance_metric=distance_metric)
