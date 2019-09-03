@@ -202,7 +202,7 @@ class LogisticNormalizer(Normalizer):
         :param data: data to normalize (np.array)
         :return: normalized data (np.array)
         """
-        self.stdsc = VarianceNormalizer()
+        self.stdsc = StandardNormalizer()
         data = self.stdsc.normalize(data)
         return 1/(1+np.exp(-data))
 
@@ -223,7 +223,7 @@ class LogisticNormalizer(Normalizer):
         :param data: data to normalize (np.array)
         :return: normalized data (np.array)
         """
-        data = VarianceNormalizer().normalize_by(raw_data, data)
+        data = StandardNormalizer().normalize_by(raw_data, data)
         return 1/(1+np.exp(-data))
 
     def denormalize_by(self, raw_data, data):
@@ -234,7 +234,7 @@ class LogisticNormalizer(Normalizer):
         :return: denormalized data (np.array)
         """
         data = np.log(data/(1-data))
-        data = VarianceNormalizer().denormalize_by(raw_data, data)
+        data = StandardNormalizer().denormalize_by(raw_data, data)
         return data
 
 
@@ -273,7 +273,7 @@ class BoxCox:
         :param data: data to normalize (np.array)
         :return: normalized data (np.array)
         """
-        self.stdnorm = VarianceNormalizer()
+        self.stdnorm = StandardNormalizer()
         data, self.lambdas = self._boxcox(data)
         data = self.stdnorm.normalize(data)
         return data
@@ -295,7 +295,7 @@ class BoxCox:
         :param data: data to normalize (np.array)
         :return: normalized data (np.array)
         """
-        stdnorm = VarianceNormalizer()
+        stdnorm = StandardNormalizer()
         raw_data_norm, lambdas = self._boxcox(raw_data)
         data, _ = self._boxcox(data, lambdas)
         data = stdnorm.normalize_by(raw_data_norm, data)
@@ -308,7 +308,7 @@ class BoxCox:
         :param data: data to denormalize (np.array)
         :return: denormalized data (np.array)
         """
-        stdnorm = VarianceNormalizer()
+        stdnorm = StandardNormalizer()
         raw_data_norm, lambdas = self._boxcox(raw_data)
         data = stdnorm.denormalize_by(raw_data_norm, data)
         data = self._inv_boxcox(data, lambdas)
