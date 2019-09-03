@@ -1,7 +1,6 @@
 import math
 from collections import Counter
 import logging
-import itertools
 import numpy as np
 from scipy import signal
 from matplotlib import cm, pyplot as plt
@@ -10,42 +9,65 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from somnium.lattice import LatticeFactory
 
 
-def plot_map(d_matrix,
-             titles=[],
+def plot_map(components_matrix,
+             titles=tuple(),
              colormap=cm.gray,
-             shape=[1, 1],
+             shape=(1, 1),
              lattice="hexa",
              mode="color",
              fig=None):
     """
-    Plot hexagon map where each neuron is represented by a hexagon. The hexagon
-    color is given by the distance between the neurons (D-Matrix)
-
-    Args:
-    - grid: Grid dictionary (keys: centers, x, y ),
-    - d_matrix: array contaning the distances between each neuron
-    - w: width of the map in inches
-    - title: map title
-
-    Returns the Matplotlib SubAxis instance
+    Plots a map of components. It works for hexagonal and rectangular lattice as well as with color and element size
+    representations.
+    :param components_matrix: matrix containing all the components to be plotted in the map. The shape must be:
+    (n_rows, n_cols, n_components). The resulting map will have as many components as the last axis of the
+    matrix provided (n_components). (np.array)
+    :param titles: list containing the names of the components to be plotted. If not provided, no titles will be
+    added to the components in the resulting figure (list or iterable)
+    :param colormap: colormap to use to generate the plots (matplotlib.cm)
+    :param shape: shape for the componentds subplots. It should have the following format: (n_rows, n_columns).
+    In order to be valid, n_rows * columns >= n_components (tuple)
+    :param lattice: lattice to be used to plot the components. Allowed lattices are 'rect' and 'hexa', for rectangular
+    and hexagonal grids (str)
+    :param mode: indicates how the data should be represented in the components (str). There are two possibilities:
+      - 'color': the values of the components will be represented as colors in the grid
+      - 'size': the value of the components will be represented as sizes of the elements of the grid.
+    :param fig: figure to use to plot the components map (matplotlib.pyplot.figure)
+    :return: axis of the last component and list of coordinates of the centers (tuple)
     """
     mpl_logger = logging.getLogger('matplotlib')
     mpl_logger.setLevel(logging.WARNING)
-    d_matrix = np.flip(d_matrix, axis=0)
-    d_matrix = np.flip(d_matrix, axis=1)
-    d_matrix = np.expand_dims(d_matrix, 2) if d_matrix.ndim < 3 else d_matrix
-    titles = [""] * d_matrix.shape[2] if len(titles) != d_matrix.shape[2] else titles
+    components_matrix = np.flip(components_matrix, axis=0)
+    components_matrix = np.flip(components_matrix, axis=1)
+    components_matrix = np.expand_dims(components_matrix, 2) if components_matrix.ndim < 3 else components_matrix
+    titles = [""] * components_matrix.shape[2] if len(titles) != components_matrix.shape[2] else titles
 
-    for comp, title in zip(range(d_matrix.shape[2]), titles):
-        ax = fig.add_subplot(shape[0], shape[1], comp + 1, aspect='equal')
-        dm = d_matrix[:, :, comp].reshape(np.multiply(*d_matrix.shape[:2]))
-        ax, n_centers = plot_comp(dm=dm, title=title, ax=ax, map_shape=d_matrix.shape[:2], colormap=colormap,
-                                  lattice=lattice, mode=mode)
-    return ax, list(reversed(n_centers))
+    for comp_idx, title in zip(range(components_matrix.shape[2]), titles):
+        ax = fig.add_subplot(shape[0], shape[1], comp_idx + 1, aspect='equal')
+        component_matrix = components_matrix[:, :, comp_idx].reshape(np.multiply(*components_matrix.shape[:2]))
+        ax, coordinates = plot_comp(component_matrix=component_matrix, title=title, ax=ax,
+                                    map_shape=components_matrix.shape[:2], colormap=colormap,lattice=lattice, mode=mode)
+    return ax, list(reversed(coordinates))
 
 
-def plot_comp(dm, title, ax, map_shape, colormap, lattice="hexa", mode="color"):
-    # discover radius and hexagon
+def plot_comp(component_matrix, title, ax, map_shape, colormap, lattice="hexa", mode="color"):
+    """
+    Plots a component into a rectangular or hexagonal lattice. It allows 'color' and 'size' modes, meaning that the
+    data in the component matrix can be represented as colors or as sizes of the elements in the plot
+    :param component_matrix: matrix containing the data which is intended to be ploted. It must be a 2-D matrix
+    (np.array)
+    :param title: title to be assigned to the component (str)
+    :param ax: matplotlib axis to use to plot the component (matplotlib axis)
+    :param map_shape: shape of the codebook matrices (tuple)
+    :param colormap: colormap to use to generate the plots (matplotlib.cm)
+    :param lattice: lattice to be used to plot the components. Allowed lattices are 'rect' and 'hexa', for rectangular
+    and hexagonal grids (str)
+    :param mode: indicates how the data should be represented in the components (str). There are two possibilities:
+      - 'color': the values of the components will be represented as colors in the grid
+      - 'size': the value of the components will be represented as sizes of the elements of the grid.
+    :return: axis of the last component and list of coordinates of the centers (tuple)
+    """
+    # describe rectangle or hexagon
     if lattice == "hexa":
         radius_f = lambda x: x * 2 / 3
         rotation = 0
@@ -75,16 +97,16 @@ def plot_comp(dm, title, ax, map_shape, colormap, lattice="hexa", mode="color"):
     area_inner_circle = math.pi * (radius ** 2)
 
     if mode == "color":
-        sizes = [area_inner_circle] * dm.shape[0]
+        sizes = [area_inner_circle] * component_matrix.shape[0]
     elif mode == "size":
-        sizes = area_inner_circle * (dm.reshape(-1) / dm.max())
-        dm = dm * 0
+        sizes = area_inner_circle * (component_matrix.reshape(-1) / component_matrix.max())
+        component_matrix = component_matrix * 0
 
     collection_bg = RegularPolyCollection(
         numsides=numsides,  # a hexagon
         rotation=rotation,
         sizes=sizes,
-        array=dm,
+        array=component_matrix,
         cmap=colormap,
         offsets=coordinates,
         transOffset=ax.transData,
@@ -103,6 +125,16 @@ def plot_comp(dm, title, ax, map_shape, colormap, lattice="hexa", mode="color"):
 
 
 def plot_components(model, data, names, colormap=plt.cm.jet, max_subplot_columns=5, figure_width=20):
+    """
+    High level function to plot the components of a Self-Organising Map model.
+    :param model: model which codebook will be represented (somnia SOM model)
+    :param data: original dataset used to denormalize the codebook (np.array)
+    :param names: names to be used for inserting the titles in the components of the figure (list or iterable)
+    :param colormap: colormap to use to generate the plots (matplotlib.cm)
+    :param max_subplot_columns: number of columns in the resulting figure subplots (int)
+    :param figure_width: width of the figure (int)
+    :return: None (void)
+    """
     codebook = model.normalizer.denormalize_by(data, model.codebook.matrix)
     codebook = codebook.reshape(list(model.codebook.mapsize) + [model.codebook.matrix.shape[-1]])
     subplot_cols = min(codebook.shape[-1], max_subplot_columns)
@@ -120,7 +152,13 @@ def plot_components(model, data, names, colormap=plt.cm.jet, max_subplot_columns
 
 
 def plot_bmus(model, figure_width=20):
-    bmu_hits = calculate_counts_matrix(model)
+    """
+    High level function to plot the bmus hit-map of a Self-Organising Map model.
+    :param model: model which codebook will be used to calculate and represent the plot (somnia SOM model)
+    :param figure_width: width of the figure (int)
+    :return: None (void)
+    """
+    bmu_hits = calculate_bmus_matrix(model)
     subplot_cols = 1
     subplot_rows = 1
     subplots_shape = (subplot_rows, subplot_cols)
@@ -135,14 +173,27 @@ def plot_bmus(model, figure_width=20):
     plt.show()
 
 
-def calculate_counts_matrix(model):
+def calculate_bmus_matrix(model):
+    """
+    Function used to calculate how many times each neuron has been a best matching unit
+    :param model: model which codebook will be used to calculate and represent the plot (somnia SOM model)
+    :return: bmu_hits matrix (np.array)
+    """
     counts = Counter(model.bmu[0])
     counts = [counts.get(x, 0) for x in range(model.codebook.nnodes)]
-    mp = np.array(counts).reshape(model.codebook.n_rows, model.codebook.n_columns)
-    return mp
+    bmu_hits = np.array(counts).reshape(model.codebook.n_rows, model.codebook.n_columns)
+    return bmu_hits
 
 
 def plot_umatrix(model, colormap=plt.cm.hot, figure_width=20):
+    """
+    High level function to plot the U-Matrix of a Self-Organising Map codebook.
+    :param model: model which codebook will be used to calculate and represent the U-Matrix (somnia SOM model)
+    :param data: original dataset used to denormalize the codebook (np.array)
+    :param colormap: colormap to use to generate the plots (matplotlib.cm)
+    :param figure_width: width of the figure (int)
+    :return: None (void)
+    """
     codebook = model.codebook.matrix.reshape(model.codebook.n_rows, model.codebook.n_columns, -1)
     if model.codebook.lattice.name == "rect":
         umat = calculate_umatrix_rect(codebook)
@@ -163,6 +214,11 @@ def plot_umatrix(model, colormap=plt.cm.hot, figure_width=20):
 
 
 def calculate_umatrix_rect(codebook):
+    """
+    Calculates the U-Matrix of a codebook with a rectangular lattice
+    :param codebook: codebook to be used to calculate the U-Matrix (np.array)
+    :return: U-Matrix (np.array)
+    """
     UMatrix = np.zeros((codebook.shape[0] + codebook.shape[0] - 1, codebook.shape[1] + codebook.shape[1] - 1))
     rows_dist = np.sqrt(((codebook[:-1, :, :] - codebook[1:, :, :]) ** 2).sum(axis=-1))  # Shift rows
     cols_dist = np.sqrt(((codebook[:, :-1, :] - codebook[:, 1:, :]) ** 2).sum(axis=-1))  # Shift columns
@@ -178,6 +234,11 @@ def calculate_umatrix_rect(codebook):
 
 
 def calculate_umatrix_hexa(codebook):
+    """
+    Calculates the U-Matrix of a codebook with a hexagonal lattice
+    :param codebook: codebook to be used to calculate the U-Matrix (np.array)
+    :return: U-Matrix (np.array)
+    """
     UMatrix = np.zeros((codebook.shape[0] + codebook.shape[0] - 1, codebook.shape[1] + codebook.shape[1]))
     # Mark neurons
     UMatrix[::4,1::2] = -3
