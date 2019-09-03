@@ -124,18 +124,17 @@ def plot_comp(component_matrix, title, ax, map_shape, colormap, lattice="hexa", 
     return ax, coordinates
 
 
-def plot_components(model, data, names, colormap=plt.cm.jet, max_subplot_columns=5, figure_width=20):
+def plot_components(model, names, colormap=plt.cm.jet, max_subplot_columns=5, figure_width=20):
     """
     High level function to plot the components of a Self-Organising Map model.
     :param model: model which codebook will be represented (somnia SOM model)
-    :param data: original dataset used to denormalize the codebook (np.array)
     :param names: names to be used for inserting the titles in the components of the figure (list or iterable)
     :param colormap: colormap to use to generate the plots (matplotlib.cm)
     :param max_subplot_columns: number of columns in the resulting figure subplots (int)
     :param figure_width: width of the figure (int)
     :return: None (void)
     """
-    codebook = model.normalizer.denormalize_by(data, model.codebook.matrix)
+    codebook = model.normalizer.denormalize(model.codebook.matrix)
     codebook = codebook.reshape(list(model.codebook.mapsize) + [model.codebook.matrix.shape[-1]])
     subplot_cols = min(codebook.shape[-1], max_subplot_columns)
     subplot_rows = math.ceil(codebook.shape[-1] / subplot_cols)
