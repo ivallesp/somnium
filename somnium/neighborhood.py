@@ -2,7 +2,7 @@ import numpy as np
 import inspect
 import sys
 
-small = .000000000001
+epsilon = .000000000001
 
 
 class NeighborhoodFactory(object):
@@ -34,7 +34,7 @@ class BubbleNeighborhood(object):
 
     @staticmethod
     def calculate(distance_matrix, radius, dim):
-        return np.where(distance_matrix > radius, 0.0, 1.0).reshape(dim, dim) + small
+        return np.where(distance_matrix > radius, 0.0, 1.0).reshape(dim, dim) + epsilon
 
     def __call__(self, *args, **kwargs):
         return self.calculate(*args, **kwargs)
@@ -47,7 +47,7 @@ class CutGaussianNeighborhood(object):
     def calculate(distance_matrix, radius, dim):
         gaussian = np.exp(-(distance_matrix**2)/(2.0*radius**2)).reshape(dim, dim)
         threshold = np.exp(-(radius**2)/(2.0*radius**2))
-        gaussian[gaussian < threshold] = small  # Cut at radius
+        gaussian[gaussian < threshold] = epsilon  # Cut at radius
         return gaussian
 
     def __call__(self, *args, **kwargs):
@@ -60,7 +60,7 @@ class EpanechicovNeighborhood(object):
 
     @staticmethod
     def calculate(distance_matrix, radius, dim):
-        return np.clip(1-(distance_matrix/radius)**2, small, None).reshape(dim, dim)
+        return np.clip(1 - (distance_matrix/radius) ** 2, epsilon, None).reshape(dim, dim)
 
     def __call__(self, *args, **kwargs):
         return self.calculate(*args, **kwargs)
