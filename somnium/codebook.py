@@ -5,9 +5,33 @@ from somnium.lattice import LatticeFactory
 
 
 class Codebook(object):
-
+    """
+    Structure used to gather all the codebook-related information. It stores the following information:
+    - the codebook matrix
+    - the shapes of the maps
+    - the lattice information
+    - the initialization methods (random/PCA)
+    :param mapsize: shape of the maps to be used in the SOM algorithm (tuple)
+    :param lattice: hexagonal or rectangular lattice ("hexa" or "rect") (str)
+    :param distance_metric: distance metric to be used in the lattice operations (str). The supported distance metrics
+    are the same ones as the supported by scipy:
+    - braycurtis
+    - canberra
+    - chebyshev
+    - cityblock
+    - correlation
+    - cosine
+    - euclidean
+    - jensenshannon
+    - mahalanobis
+    - minkowski
+    - seuclidean
+    - sqeuclidean
+    - wminkowski
+    More info at https://docs.scipy.org/doc/scipy/reference/spatial.distance.html
+    """
     def __init__(self, mapsize, lattice='hexa', distance_metric="sqeuclidean"):
-        self.mapsize =  [1, np.max(mapsize)] if 1 == np.min(mapsize) else mapsize
+        self.mapsize = [1, np.max(mapsize)] if 1 == np.min(mapsize) else mapsize
         self.nnodes = mapsize[0]*mapsize[1]
         self.matrix = np.asarray(self.mapsize)
         self.initialized = False
@@ -16,9 +40,9 @@ class Codebook(object):
                                                      n_cols=self.n_columns,
                                                      distance_metric=distance_metric)
 
-
     def random_initialization(self, data):
         """
+        Initializes the codebook using a random gaussian distribution.
         :param data: data to use for the initialization
         :returns: initialized matrix with same dimension as input data
         """
@@ -29,9 +53,8 @@ class Codebook(object):
 
     def pca_linear_initialization(self, data):
         """
-        We initialize the map, just by using the first two first eigen vals and
-        eigenvectors
-        Further, we create a linear combination of them in the new map by
+        Initializes the codebook just by using the first two first eigen vals and
+        eigenvectors. Further, it creates a linear combination of them in the new map by
         giving values from -1 to 1 in each
 
         X = UsigmaWT
@@ -79,7 +102,6 @@ class Codebook(object):
         tmp_matrix = np.tile(me, (self.nnodes, 1))
 
         # Randomized PCA is scalable
-        #pca = RandomizedPCA(n_components=pca_components) # RandomizedPCA is deprecated.
         pca = PCA(n_components=pca_components, svd_solver='randomized')
 
         pca.fit(data)
