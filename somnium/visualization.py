@@ -7,24 +7,13 @@ from scipy import signal
 from matplotlib import cm, pyplot as plt
 from matplotlib.collections import RegularPolyCollection
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
-
-def create_hexa_grid_coordinates(x, y):
-    coordinates = [x for row in -1 * np.array(list(range(x))) for x in
-                   list(zip(np.arange(((row) % 2) * -0.5 + 1,  y + ((row) % 2) * -0.5 + 1), [np.sqrt(3) / 2 * (row)] * y))]
-    return np.array(list(reversed(coordinates)))
-
-def create_rect_grid_coordinates(x, y):
-    coordinates = list(itertools.product(range(0, -x, -1), range(y)))
-    return np.array(list(reversed(coordinates)))[:, ::-1]
+from somnium.lattice import LatticeFactory
 
 
 def plot_map(d_matrix,
              titles=[],
              colormap=cm.gray,
              shape=[1, 1],
-             comp_width=5,
-             hex_shrink=1.0,
              lattice="hexa",
              mode="color",
              fig=None):
@@ -58,19 +47,24 @@ def plot_map(d_matrix,
 def plot_comp(dm, title, ax, map_shape, colormap, lattice="hexa", mode="color"):
     # discover radius and hexagon
     if lattice == "hexa":
-        n_centers = create_hexa_grid_coordinates(*map_shape[:2])
         radius_f = lambda x: x * 2 / 3
         rotation = 0
         numsides = 6
     elif lattice == "rect":
-        n_centers = create_rect_grid_coordinates(*map_shape[:2])
         radius_f = lambda x: x / np.sqrt(2)
         rotation = np.pi / 4
         numsides = 4
 
+    coordinates = LatticeFactory.build(lattice).generate_lattice(*map_shape[:2])
+    # Sort to draw left-right top-bottom
+    coordinates = coordinates.copy()
+    coordinates = coordinates[:, ::-1]
+    coordinates = coordinates[np.lexsort([-coordinates[:, 0], -coordinates[:, 1]])]
+    coordinates[:, 1] = -coordinates[:, 1]
+
     # Get pixel size between two data points
-    xpoints = n_centers[:, 0]
-    ypoints = n_centers[:, 1]
+    xpoints = coordinates[:, 0]
+    ypoints = coordinates[:, 1]
     ax.scatter(xpoints, ypoints, s=0.0, marker='s')
     ax.axis([min(xpoints) - 1., max(xpoints) + 1.,
              min(ypoints) - 1., max(ypoints) + 1.])
@@ -92,7 +86,7 @@ def plot_comp(dm, title, ax, map_shape, colormap, lattice="hexa", mode="color"):
         sizes=sizes,
         array=dm,
         cmap=colormap,
-        offsets=n_centers,
+        offsets=coordinates,
         transOffset=ax.transData,
     )
     ax.add_collection(collection_bg, autolim=True)
@@ -105,7 +99,7 @@ def plot_comp(dm, title, ax, map_shape, colormap, lattice="hexa", mode="color"):
     cbar = plt.colorbar(collection_bg, cax=cax)
     if mode != "color":
         cbar.remove()
-    return ax, n_centers
+    return ax, coordinates
 
 
 def plot_components(model, data, names, colormap=plt.cm.jet, max_subplot_columns=5, figure_width=20):
@@ -126,9 +120,7 @@ def plot_components(model, data, names, colormap=plt.cm.jet, max_subplot_columns
 
 
 def plot_bmus(model, figure_width=20):
-    counts = Counter(model.bmu[0])
-    counts = [counts.get(x, 0) for x in range(model.codebook.nnodes)]
-    mp = np.array(counts).reshape(model.codebook.n_rows, model.codebook.n_columns)
+    bmu_hits = calculate_counts_matrix(model)
     subplot_cols = 1
     subplot_rows = 1
     subplots_shape = (subplot_rows, subplot_cols)
@@ -138,9 +130,16 @@ def plot_bmus(model, figure_width=20):
     yinch = comp_width * aspect_ratio * subplot_rows
     figsize = (xinch, yinch)
     fig = plt.figure(figsize=figsize, dpi=72.)
-    plot_map(mp, shape=subplots_shape, colormap=plt.cm.winter, fig=fig, lattice=model.codebook.lattice.name,
+    plot_map(bmu_hits, shape=subplots_shape, colormap=plt.cm.winter, fig=fig, lattice=model.codebook.lattice.name,
              mode="size")
     plt.show()
+
+
+def calculate_counts_matrix(model):
+    counts = Counter(model.bmu[0])
+    counts = [counts.get(x, 0) for x in range(model.codebook.nnodes)]
+    mp = np.array(counts).reshape(model.codebook.n_rows, model.codebook.n_columns)
+    return mp
 
 
 def plot_umatrix(model, colormap=plt.cm.hot, figure_width=20):

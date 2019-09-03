@@ -44,7 +44,7 @@ The API is currently being developed, which means that it is going to change fro
 - Write a proper unit-testing set.
 - Integrate with _Travis_.
 - Work on other installation methods.
-- Write at least one exaple for each application.
+- Write at least one example for each application.
 - Research for and implement algorithm enhancements.
 
 ## Known issues

@@ -19,10 +19,11 @@ class LatticeFactory(object):
 
 class Lattice:
     def __init__(self, *args, **kwargs):
-        self.coordinates = self.generate_lattice()
+        self.coordinates = self.generate_lattice(n_rows=self.n_rows, n_cols=self.n_cols)
         self.distances = self.compute_distance_matrix(distance_metric=self.distance_metric)
 
-    def generate_lattice(self):
+    @staticmethod
+    def generate_lattice(self, rows, cols, norm):
         raise NotImplementedError
 
     def are_neighbors(self, u1, u2):
@@ -39,7 +40,6 @@ class Lattice:
         dist = dist.reshape(self.n_rows * self.n_cols, self.n_rows, self.n_cols)
         return dist
 
-
 class HexaLattice(Lattice):
     name = "hexa"
 
@@ -49,15 +49,20 @@ class HexaLattice(Lattice):
         self.distance_metric = distance_metric
         super().__init__()
 
-    def generate_lattice(self):
+    @staticmethod
+    def generate_lattice(n_rows, n_cols):
         x_coord = []
         y_coord = []
-        for i in range(self.n_rows):
-            for j in range(self.n_cols):
+        for i in range(n_rows):
+            for j in range(n_cols):
                 x_coord.append(i * 1.5)
                 y_coord.append(np.sqrt(2 / 3) * (2 * j + (1 + i) % 2))
         coordinates = np.column_stack([x_coord, y_coord])
+        coordinates[:, 1] = coordinates[:, 1] * np.sqrt(3) / np.sqrt(8) + 0.5
+        coordinates[:, 0] = coordinates[:, 0] * np.sqrt(3) / 3
         return coordinates
+
+
 
     def are_neighbors(self, u1, u2):
         l2 = np.sqrt((u1[0] - u2[0]) ** 2 + (u1[1] - u2[1]) ** 2)  # Euclidean distance
@@ -73,11 +78,12 @@ class RectLattice(Lattice):
         self.distance_metric = distance_metric
         super().__init__()
 
-    def generate_lattice(self):
+    @staticmethod
+    def generate_lattice(n_rows, n_cols):
         x_coord = []
         y_coord = []
-        for i in range(self.n_rows):
-            for j in range(self.n_cols):
+        for i in range(n_rows):
+            for j in range(n_cols):
                 x_coord.append(i)
                 y_coord.append(j)
         coordinates = np.column_stack([x_coord, y_coord])
