@@ -9,6 +9,82 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from somnium.lattice import LatticeFactory
 
 
+def plot_components(model, names, colormap=plt.cm.jet, max_subplot_columns=5, figure_width=20):
+    """
+    High level function to plot the components of a Self-Organising Map model.
+    :param model: model which codebook will be represented (somnia SOM model)
+    :param names: names to be used for inserting the titles in the components of the figure (list or iterable)
+    :param colormap: colormap to use to generate the plots (matplotlib.cm)
+    :param max_subplot_columns: number of columns in the resulting figure subplots (int)
+    :param figure_width: width of the figure (int)
+    :return: None (void)
+    """
+    codebook = model.normalizer.denormalize(model.codebook.matrix)
+    codebook = codebook.reshape(list(model.codebook.mapsize) + [model.codebook.matrix.shape[-1]])
+    subplot_cols = min(codebook.shape[-1], max_subplot_columns)
+    subplot_rows = math.ceil(codebook.shape[-1] / subplot_cols)
+    subplots_shape = [subplot_rows, subplot_cols]
+    aspect_ratio = model.codebook.n_columns / model.codebook.n_rows
+    xinch = figure_width
+    comp_width = (figure_width / subplot_cols)
+    yinch = comp_width * aspect_ratio * subplot_rows
+    figsize = (xinch, yinch)
+    fig = plt.figure(figsize=figsize, dpi=72)
+    plot_map(codebook, titles=names, shape=subplots_shape, colormap=colormap, fig=fig,
+             lattice=model.codebook.lattice.name, mode="color");
+    plt.show()
+
+
+def plot_bmus(model, figure_width=20):
+    """
+    High level function to plot the bmus hit-map of a Self-Organising Map model.
+    :param model: model which codebook will be used to calculate and represent the plot (somnia SOM model)
+    :param figure_width: width of the figure (int)
+    :return: None (void)
+    """
+    bmu_hits = calculate_bmus_matrix(model)
+    subplot_cols = 1
+    subplot_rows = 1
+    subplots_shape = (subplot_rows, subplot_cols)
+    aspect_ratio = model.codebook.n_columns / model.codebook.n_rows
+    xinch = figure_width
+    comp_width = (figure_width / subplot_cols)
+    yinch = comp_width * aspect_ratio * subplot_rows
+    figsize = (xinch, yinch)
+    fig = plt.figure(figsize=figsize, dpi=72.)
+    plot_map(bmu_hits, shape=subplots_shape, colormap=plt.cm.winter, fig=fig, lattice=model.codebook.lattice.name,
+             mode="size")
+    plt.show()
+
+
+def plot_umatrix(model, colormap=plt.cm.hot, figure_width=20):
+    """
+    High level function to plot the U-Matrix of a Self-Organising Map codebook.
+    :param model: model which codebook will be used to calculate and represent the U-Matrix (somnia SOM model)
+    :param data: original dataset used to denormalize the codebook (np.array)
+    :param colormap: colormap to use to generate the plots (matplotlib.cm)
+    :param figure_width: width of the figure (int)
+    :return: None (void)
+    """
+    codebook = model.codebook.matrix.reshape(model.codebook.n_rows, model.codebook.n_columns, -1)
+    if model.codebook.lattice.name == "rect":
+        umat = calculate_umatrix_rect(codebook)
+    elif model.codebook.lattice.name == "hexa":
+        umat = calculate_umatrix_hexa(codebook)
+    subplot_cols = 1
+    subplot_rows = 1
+    subplots_shape = (subplot_rows, subplot_cols)
+    aspect_ratio = umat.shape[1] / umat.shape[0]
+    xinch = figure_width
+    comp_width = (figure_width / subplot_cols)
+    yinch = comp_width * aspect_ratio * subplot_rows
+    figsize = (xinch, yinch)
+    fig = plt.figure(figsize=figsize, dpi=72.)
+    plot_map(umat, shape=subplots_shape, colormap=colormap, fig=fig, lattice=model.codebook.lattice.name,
+             mode="color")
+    plt.show()
+
+
 def plot_map(components_matrix,
              titles=tuple(),
              colormap=cm.gray,
@@ -124,54 +200,6 @@ def plot_comp(component_matrix, title, ax, map_shape, colormap, lattice="hexa", 
     return ax, coordinates
 
 
-def plot_components(model, names, colormap=plt.cm.jet, max_subplot_columns=5, figure_width=20):
-    """
-    High level function to plot the components of a Self-Organising Map model.
-    :param model: model which codebook will be represented (somnia SOM model)
-    :param names: names to be used for inserting the titles in the components of the figure (list or iterable)
-    :param colormap: colormap to use to generate the plots (matplotlib.cm)
-    :param max_subplot_columns: number of columns in the resulting figure subplots (int)
-    :param figure_width: width of the figure (int)
-    :return: None (void)
-    """
-    codebook = model.normalizer.denormalize(model.codebook.matrix)
-    codebook = codebook.reshape(list(model.codebook.mapsize) + [model.codebook.matrix.shape[-1]])
-    subplot_cols = min(codebook.shape[-1], max_subplot_columns)
-    subplot_rows = math.ceil(codebook.shape[-1] / subplot_cols)
-    subplots_shape = [subplot_rows, subplot_cols]
-    aspect_ratio = model.codebook.n_columns / model.codebook.n_rows
-    xinch = figure_width
-    comp_width = (figure_width / subplot_cols)
-    yinch = comp_width * aspect_ratio * subplot_rows
-    figsize = (xinch, yinch)
-    fig = plt.figure(figsize=figsize, dpi=72)
-    plot_map(codebook, titles=names, shape=subplots_shape, colormap=colormap, fig=fig,
-             lattice=model.codebook.lattice.name, mode="color");
-    plt.show()
-
-
-def plot_bmus(model, figure_width=20):
-    """
-    High level function to plot the bmus hit-map of a Self-Organising Map model.
-    :param model: model which codebook will be used to calculate and represent the plot (somnia SOM model)
-    :param figure_width: width of the figure (int)
-    :return: None (void)
-    """
-    bmu_hits = calculate_bmus_matrix(model)
-    subplot_cols = 1
-    subplot_rows = 1
-    subplots_shape = (subplot_rows, subplot_cols)
-    aspect_ratio = model.codebook.n_columns / model.codebook.n_rows
-    xinch = figure_width
-    comp_width = (figure_width / subplot_cols)
-    yinch = comp_width * aspect_ratio * subplot_rows
-    figsize = (xinch, yinch)
-    fig = plt.figure(figsize=figsize, dpi=72.)
-    plot_map(bmu_hits, shape=subplots_shape, colormap=plt.cm.winter, fig=fig, lattice=model.codebook.lattice.name,
-             mode="size")
-    plt.show()
-
-
 def calculate_bmus_matrix(model):
     """
     Function used to calculate how many times each neuron has been a best matching unit
@@ -182,34 +210,6 @@ def calculate_bmus_matrix(model):
     counts = [counts.get(x, 0) for x in range(model.codebook.nnodes)]
     bmu_hits = np.array(counts).reshape(model.codebook.n_rows, model.codebook.n_columns)
     return bmu_hits
-
-
-def plot_umatrix(model, colormap=plt.cm.hot, figure_width=20):
-    """
-    High level function to plot the U-Matrix of a Self-Organising Map codebook.
-    :param model: model which codebook will be used to calculate and represent the U-Matrix (somnia SOM model)
-    :param data: original dataset used to denormalize the codebook (np.array)
-    :param colormap: colormap to use to generate the plots (matplotlib.cm)
-    :param figure_width: width of the figure (int)
-    :return: None (void)
-    """
-    codebook = model.codebook.matrix.reshape(model.codebook.n_rows, model.codebook.n_columns, -1)
-    if model.codebook.lattice.name == "rect":
-        umat = calculate_umatrix_rect(codebook)
-    elif model.codebook.lattice.name == "hexa":
-        umat = calculate_umatrix_hexa(codebook)
-    subplot_cols = 1
-    subplot_rows = 1
-    subplots_shape = (subplot_rows, subplot_cols)
-    aspect_ratio = umat.shape[1] / umat.shape[0]
-    xinch = figure_width
-    comp_width = (figure_width / subplot_cols)
-    yinch = comp_width * aspect_ratio * subplot_rows
-    figsize = (xinch, yinch)
-    fig = plt.figure(figsize=figsize, dpi=72.)
-    plot_map(umat, shape=subplots_shape, colormap=colormap, fig=fig, lattice=model.codebook.lattice.name,
-             mode="color")
-    plt.show()
 
 
 def calculate_umatrix_rect(codebook):
