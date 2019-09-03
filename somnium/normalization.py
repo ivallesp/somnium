@@ -41,7 +41,11 @@ class Normalizer(object):
         raise NotImplementedError()
 
 
-class VarianceNormalizer(Normalizer):
+class StandardNormalizer(Normalizer):
+    """
+    Standard scaling and centering normalization
+    z = \frac{x - mean(x)}{std(x)}
+    """
     name = 'standard'
 
     def _mean_and_standard_dev(self, data):
@@ -93,6 +97,10 @@ class VarianceNormalizer(Normalizer):
 
 
 class MinMaxNormalizer(Normalizer):
+    """
+    Min-Max centering and scaling normalization
+    z = \frac{x - min(x)}{max(x)}
+    """
     name = 'minmax'
     def _min_and_max(self, data):
         """
@@ -141,6 +149,10 @@ class MinMaxNormalizer(Normalizer):
 
 
 class LogNormalizer(Normalizer):
+    """
+    Logarithm normalization
+    z = log(x+1)
+    """
     name = 'log'
     def normalize(self, data):
         """
@@ -178,6 +190,11 @@ class LogNormalizer(Normalizer):
 
 
 class LogisticNormalizer(Normalizer):
+    """
+    Logistic function normalization, after a standard normalization.
+     x' = \frac{x - mean(x)}{std(x)}
+     z = log(x')
+    """
     name = 'logistic'
     def normalize(self, data):
         """
@@ -222,6 +239,11 @@ class LogisticNormalizer(Normalizer):
 
 
 class BoxCox:
+    """
+    Box-Cox function normalization, after a standard normalization.
+     x' = \frac{x - mean(x)}{std(x)}
+     z = box-cox(x)
+    """
     name = 'boxcox'
     @staticmethod
     def _boxcox(data, lambdas=None):
