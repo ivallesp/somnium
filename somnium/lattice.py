@@ -12,7 +12,7 @@ class LatticeFactory(object):
     def build(lattice):
         """
         Looks for the existing lattices and returns the chosen one if exists. If it doesn't, it throws an exception
-        :param name: name of the lattice
+        :param lattice: name of the lattice
         :return: lattice class (class)
         """
         for name, obj in inspect.getmembers(sys.modules[__name__]):
