@@ -253,7 +253,10 @@ class BoxCox:
         :param lambdas: lambdas to use, if not specified, they are automatically inferred (list or iterable or None)
         :return: data normalized and lambdas (tuple)
         """
-        data, lambdas = list(zip(*map(boxcox, data.T))) if lambdas is None else list(zip(*map(boxcox, data.T, lambdas)))
+        if lambdas is None:
+            data, lambdas = list(zip(*map(boxcox, data.T)))
+        else:
+            data = list(map(boxcox, data.T, lambdas))
         return np.array(data).T, lambdas
 
     @staticmethod
