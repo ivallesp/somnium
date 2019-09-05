@@ -1,8 +1,10 @@
 import inspect
 import sys
 import scipy as sp
+from scipy.spatial.distance import pdist, squareform
 import numpy as np
 
+epsilon = 1e-6
 
 class LatticeFactory(object):
     """
@@ -68,8 +70,8 @@ class Lattice:
         :param distance_metric: name of the distance metric to use to compute the distances (str)
         :return: distance matrix (np.array)
         """
-        dist = sp.spatial.distance.pdist(self.coordinates, metric=distance_metric)
-        dist = sp.spatial.distance.squareform(dist)
+        dist = pdist(self.coordinates, metric=distance_metric)
+        dist = squareform(dist)
         dist = dist.reshape(self.n_rows * self.n_cols, self.n_rows, self.n_cols)
         return dist
 
@@ -117,7 +119,7 @@ class HexaLattice(Lattice):
         :return: boolean value indicating if the units are neighbors (bool)
         """
         l2 = np.sqrt((u1[0] - u2[0]) ** 2 + (u1[1] - u2[1]) ** 2)  # Euclidean distance
-        return l2 < 2
+        return l2 <= (1 + epsilon)
 
 
 class RectLattice(Lattice):
@@ -160,4 +162,4 @@ class RectLattice(Lattice):
         :return: boolean value indicating if the units are neighbors (bool)
         """
         l2 = np.sqrt((u1[0] - u2[0]) ** 2 + (u1[1] - u2[1]) ** 2)  # Euclidean distance
-        return l2 <= 1
+        return l2 <= (1 + epsilon)
