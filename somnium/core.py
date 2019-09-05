@@ -38,6 +38,7 @@ class SOM:
         self.n_jobs = n_jobs
         self.model_is_unfitted = True
         self.bmu = None
+        self.data_norm = None
 
     def fit(self, data, epochs, radiusin, radiusfin):
         """
@@ -80,12 +81,11 @@ class SOM:
         :param n_jobs: number of jobs used to find the bmus (int)
         :return: the topographic error (float)
         """
-        bmus1 = \
-        find_bmu(self.codebook, self.data_norm, metric=self.codebook.lattice.distance_metric, njb=n_jobs, nth=1)[0]
-        bmus2 = \
-        find_bmu(self.codebook, self.data_norm, metric=self.codebook.lattice.distance_metric, njb=n_jobs, nth=2)[0]
+        metric = self.codebook.lattice.distance_metric
+        bmus1 = find_bmu(self.codebook, self.data_norm, metric=metric, njb=n_jobs, nth=1)[0]
+        bmus2 = find_bmu(self.codebook, self.data_norm, metric=metric, njb=n_jobs, nth=2)[0]
         neighs = [self.codebook.lattice.are_neighbor_indices(int(x1), int(x2)) for (x1, x2) in zip(bmus1, bmus2)]
-        return (1 - np.mean(neighs))
+        return 1 - np.mean(neighs)
 
 
 def train_som(data, codebook, epochs, radiusin, radiusfin, neighborhood_f, distance_matrix, distance_metric, n_jobs):
@@ -122,31 +122,33 @@ def update_codebook_voronoi(codebook, training_data, bmu, neighborhood, _dlen):
     Super fast comparing to classic batch training algorithm, it is based
     on the implemented algorithm in som toolbox for Matlab by Helsinky
     University.
-
+    :param codebook: codebook object to be updated (somnium.codebook)
     :param training_data: input matrix with input vectors as rows and
         vector features as cols
     :param bmu: best matching unit for each input data. Has shape of
         (2, dlen) where first row has bmu indexes
     :param neighborhood: matrix representing the neighborhood of each bmu
-
+    :param _dlen: number of instances in the data (int)
     :return: An updated codebook that incorporates the learnings from the
         input data
     """
     row = bmu[0].astype(int)
     col = np.arange(_dlen)
     val = np.tile(1, _dlen)
-    p = csr_matrix((val, (row, col)),
-                   shape=(codebook.nnodes, _dlen))  # Matrix (nnodes, dlen) indicating the BMU for each instance (OHE)
-    s = p.dot(
-        training_data)  # (nnodes, data_length) x (data_length, feats) = (nnodes, feats). Sum data for all BMUs, we will divide to compute average later
+    # Matrix (nnodes, dlen) indicating the BMU for each instance (OHE)
+    p = csr_matrix((val, (row, col)), shape=(codebook.nnodes, _dlen))
+    # (nnodes, data_length) x (data_length, feats) = (nnodes, feats). Sum data for all BMUs, we will divide to
+    # compute average later
+    s = p.dot(training_data)
 
     # neighborhood has nnodes*nnodes and S has nnodes*dim
     # ---> Nominator has nnodes*dim
-    # I am not sure if I have to transpose the neighborhood
-    numerator = neighborhood.T.dot(s)  # Weight by neighborhood function, adds neighbors value
-    nV = p.sum(axis=1).reshape(1, codebook.nnodes)  # Number of hits per BMU
-    denominator = nV.dot(neighborhood.T).reshape(codebook.nnodes,
-                                                 1)  # Weight by neighborhood function (allows dividing apples by apples)
+    # Weight by neighborhood function, adds neighbors value
+    numerator = neighborhood.T.dot(s)
+    # Number of hits per BMU
+    n_v = p.sum(axis=1).reshape(1, codebook.nnodes)
+    # Weight by neighborhood function (allows dividing apples by apples)
+    denominator = n_v.dot(neighborhood.T).reshape(codebook.nnodes, 1)
     new_codebook = np.divide(numerator, denominator)  # Compute the average
     return np.around(new_codebook, decimals=6)
 
@@ -178,6 +180,7 @@ def find_bmu(codebook, input_matrix, metric, njb=1, nth=1):
 
     :param codebook: codebook matrix to compare the input matrix with (np.array)
     :param input_matrix: numpy matrix representing inputs as rows and features/dimension as cols (np.array)
+    :param metric: name of the distance metric to use. See scipy cdist/pdist documentation for more info (str)
     :param njb: number of jobs to parallelize the search (int)
     :param nth: rank of the best matching unit to look for. 1st by default. 2nd is used for calculating the
     topographic error (int)

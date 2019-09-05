@@ -46,6 +46,10 @@ The API is currently being developed, which means that it is going to change fro
 - Work on other installation methods.
 - Write at least one example for each application.
 - Research for and implement algorithm enhancements.
+- Improve error management, create an errors module for that purpose.
+    - ModelNotTrainedError
+    - [...]
+- Enhance reproducibility. Start by setting a seed.
 
 ## Known issues
 - The current visualization engine only runs well under ``jupyter notebooks``. If you run it from a _python_ or _ipython_ console the figures will not look well.
