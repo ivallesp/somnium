@@ -33,7 +33,7 @@ class Codebook(object):
     def __init__(self, mapsize, lattice='hexa', distance_metric="sqeuclidean"):
         self.mapsize = [1, np.max(mapsize)] if 1 == np.min(mapsize) else mapsize
         self.nnodes = mapsize[0]*mapsize[1]
-        self.matrix = np.asarray(self.mapsize)
+        self.matrix = None
         self.initialized = False
         self.n_rows, self.n_columns = self.mapsize
         self.lattice = LatticeFactory.build(lattice)(n_rows=self.n_rows,
