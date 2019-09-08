@@ -3,6 +3,7 @@ import numpy as np
 import random
 
 from somnium.core import SOM, find_bmu
+from somnium.exceptions import ModelNotTrainedError, InvalidValuesInDataSet
 
 
 class TestGeneralTraining(TestCase):
@@ -13,6 +14,7 @@ class TestGeneralTraining(TestCase):
                     distance_metric="euclidean", n_jobs=1)
         model.codebook.random_initialization(data)  # Manually initialize the codebook
         model.data_norm = model.normalizer.normalize(data)
+        model.model_is_unfitted = False
         e_q, e_t = model.calculate_quantization_error(), model.calculate_topographic_error()
         f1_0 = 1/(1/e_q + 1/e_t)
 
@@ -29,6 +31,7 @@ class TestGeneralTraining(TestCase):
                     distance_metric="euclidean", n_jobs=1)
         model.codebook.random_initialization(data)  # Manually initialize the codebook
         model.data_norm = model.normalizer.normalize(data)
+        model.model_is_unfitted = False
         e_q, e_t = model.calculate_quantization_error(), model.calculate_topographic_error()
         f1_0 = 1/(1/e_q + 1/e_t)
 
@@ -50,6 +53,7 @@ class TestGeneralTraining(TestCase):
                                     lattice=lattice, distance_metric=distance_metric, n_jobs=1)
                         model.codebook.random_initialization(data)  # Manually initialize the codebook
                         model.data_norm = model.normalizer.normalize(data)
+                        model.model_is_unfitted = False
                         e_q, e_t = model.calculate_quantization_error(), model.calculate_topographic_error()
                         max_error_0 = max(e_q, e_t)
 
@@ -65,6 +69,7 @@ class TestGeneralTraining(TestCase):
                     distance_metric="euclidean", n_jobs=1)
         model.codebook.random_initialization(data)  # Manually initialize the codebook
         model.data_norm = model.normalizer.normalize(data)
+        model.model_is_unfitted = False
 
         i = random.sample(range(150), 50)
         input_data = model.codebook.matrix[i, :]
@@ -85,10 +90,10 @@ class TestGeneralTraining(TestCase):
                     distance_metric="euclidean", n_jobs=1)
         model.codebook.random_initialization(data)  # Manually initialize the codebook
         model.data_norm = model.normalizer.normalize(data)
+        model.model_is_unfitted = False
 
         i = random.sample(range(148), 50)
         j = [x + 1 for x in i]
-        k = [x + 2 for x in i]
         input_data = model.codebook.matrix[i, :]*0.6 + model.codebook.matrix[j, :]*0.4
 
         # Single thread
@@ -102,3 +107,21 @@ class TestGeneralTraining(TestCase):
         self.assertTrue((bmus[0] == i).all())
         bmus = find_bmu(codebook=model.codebook, input_matrix=input_data, metric="euclidean", njb=6, nth=2)
         self.assertTrue((bmus[0] == j).all())
+
+
+class TestModelExceptions(TestCase):
+    def test_raises_exception_when_model_unfitted(self):
+        # Assure an exception is dropped when trying to calculate errors before training
+        model = SOM(neighborhood="gaussian", normalization="standard", mapsize=[15, 10], lattice="hexa",
+                    distance_metric="euclidean", n_jobs=1)
+        self.assertRaises(ModelNotTrainedError, model.calculate_topographic_error)
+        self.assertRaises(ModelNotTrainedError, model.calculate_quantization_error)
+
+    def test_nans_catching(self):
+        # Assure it drops an error when a NaN value is introduced in the data
+        data = np.random.rand(1000, 230)
+        data[25, 21] = np.nan
+        model = SOM(neighborhood="gaussian", normalization="standard", mapsize=[15, 10], lattice="hexa",
+                    distance_metric="euclidean", n_jobs=1)
+
+        self.assertRaises(InvalidValuesInDataSet, model.fit, data=data, epochs=10, radiusin=10, radiusfin=3)

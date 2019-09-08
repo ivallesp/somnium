@@ -3,6 +3,7 @@ import sys
 import inspect
 from scipy.stats import boxcox
 from scipy.special import inv_boxcox
+from somnium.exceptions import NormalizationFunctionNotFound
 
 
 class NormalizerFactory(object):
@@ -21,7 +22,7 @@ class NormalizerFactory(object):
                 if hasattr(obj, 'name') and name == obj.name:
                     return obj()
         else:
-            raise Exception("Unknown normalization type '%s'" % name)
+            raise NormalizationFunctionNotFound("Unknown normalization type '%s'" % name)
 
 
 class Normalizer(object):
@@ -48,7 +49,11 @@ class StandardNormalizer(Normalizer):
     """
     name = 'standard'
 
-    def _mean_and_standard_dev(self, data):
+    def __init__(self):
+        self.me, self.st = None, None
+
+    @staticmethod
+    def _mean_and_standard_dev(data):
         """
         Private method for calculating the mean and std dev. These statistics are calculated over the 0th axis.
         :param data: data to use to calculate the stats (np.array)
@@ -102,7 +107,12 @@ class MinMaxNormalizer(Normalizer):
     z = \frac{x - min(x)}{max(x)}
     """
     name = 'minmax'
-    def _min_and_max(self, data):
+
+    def __init__(self):
+        self.min, self.max = None, None
+
+    @staticmethod
+    def _min_and_max(data):
         """
         Private method for calculating the min and max. These statistics are calculated over the 0th axis.
         :param data: data to use to calculate the stats (np.array)
@@ -134,8 +144,8 @@ class MinMaxNormalizer(Normalizer):
         :param data: data to normalize (np.array)
         :return: normalized data (np.array)
         """
-        minimum, max = self._min_and_max(raw_data)
-        return (data-minimum)/max
+        minimum, maximum = self._min_and_max(raw_data)
+        return (data-minimum)/maximum
 
     def denormalize_by(self, raw_data, data):
         """
@@ -144,8 +154,8 @@ class MinMaxNormalizer(Normalizer):
         :param data: data to denormalize (np.array)
         :return: denormalized data (np.array)
         """
-        minimum, max = self._min_and_max(raw_data)
-        return data * max + minimum
+        minimum, maximum = self._min_and_max(raw_data)
+        return data * maximum + minimum
 
 
 class LogNormalizer(Normalizer):
@@ -154,6 +164,7 @@ class LogNormalizer(Normalizer):
     z = log(x+1)
     """
     name = 'log'
+
     def normalize(self, data):
         """
         Calculates the statistics over the data matrix, stores them in attributes and then apply them to the data
@@ -196,6 +207,10 @@ class LogisticNormalizer(Normalizer):
      z = log(x')
     """
     name = 'logistic'
+
+    def __init__(self):
+        self.stdsc = None
+
     def normalize(self, data):
         """
         Calculates the statistics over the data matrix, stores them in attributes and then apply them to the data
@@ -245,6 +260,11 @@ class BoxCox:
      z = box-cox(x)
     """
     name = 'boxcox'
+
+    def __init__(self):
+        self.stdnorm = None
+        self.lambdas = None
+
     @staticmethod
     def _boxcox(data, lambdas=None):
         """

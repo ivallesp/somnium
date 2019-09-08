@@ -11,6 +11,7 @@ from somnium.codebook import Codebook
 from somnium.normalization import NormalizerFactory
 from somnium.neighborhood import NeighborhoodFactory
 from somnium.util import batching
+from somnium.exceptions import ModelNotTrainedError, InvalidValuesInDataSet
 
 
 class SOM:
@@ -50,11 +51,13 @@ class SOM:
         :param radiusfin: size of the radius of the neighborhood function at the last epoch (float)
         :return: the model trained (SOM)
         """
+        data = _check_data(data)
         data_norm = self.normalizer.normalize(data)
         self.data_norm = data_norm
         _dlen = data_norm.shape[0]
         if self.model_is_unfitted:
             self.codebook.random_initialization(data_norm)
+            self.model_is_unfitted = False
         self.bmu = train_som(data_norm, self.codebook, epochs, radiusin, radiusfin,
                              neighborhood_f=self.neighborhood_calculator,
                              distance_matrix=self.distance_matrix,
@@ -69,6 +72,9 @@ class SOM:
         BMU.
         :return: the quantization error (float)
         """
+        if self.model_is_unfitted:
+            raise ModelNotTrainedError("The codebook of the model has not been initialized, you must call the fit "
+                                       "method before calculating the quantization error.")
         neuron_values = self.codebook.matrix[find_bmu(self.codebook, self.data_norm,
                                                       metric=self.codebook.lattice.distance_metric)[0].astype(int)]
         quantization_error = np.mean(np.abs(neuron_values - self.data_norm))
@@ -81,6 +87,9 @@ class SOM:
         :param n_jobs: number of jobs used to find the bmus (int)
         :return: the topographic error (float)
         """
+        if self.model_is_unfitted:
+            raise ModelNotTrainedError("The codebook of the model has not been initialized, you must call the fit "
+                                       "method before calculating the topographic error.")
         metric = self.codebook.lattice.distance_metric
         bmus1 = find_bmu(self.codebook, self.data_norm, metric=metric, njb=n_jobs, nth=1)[0]
         bmus2 = find_bmu(self.codebook, self.data_norm, metric=metric, njb=n_jobs, nth=2)[0]
@@ -197,3 +206,14 @@ def find_bmu(codebook, input_matrix, metric, njb=1, nth=1):
                                                           nth=nth), chunks)
     bmus = np.asarray(list(itertools.chain(*bmus))).T
     return bmus
+
+def _check_data(data):
+    if np.isnan(data).any():
+        raise InvalidValuesInDataSet("NaN values found in the data provided. Please "
+                                     "remove them and rerun the function.")
+
+    if np.isinf(data).any():
+        raise InvalidValuesInDataSet("+/- Inf values found in the data provided. Please "
+                                     "remove them and rerun the function.")
+
+    return data

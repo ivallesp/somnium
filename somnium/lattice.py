@@ -1,10 +1,11 @@
 import inspect
 import sys
-import scipy as sp
 from scipy.spatial.distance import pdist, squareform
 import numpy as np
+from somnium.exceptions import LatticeTypeNotFound
 
 epsilon = 1e-6
+
 
 class LatticeFactory(object):
     """
@@ -22,7 +23,7 @@ class LatticeFactory(object):
                 if hasattr(obj, 'name') and lattice == obj.name:
                     return obj
         else:
-            raise Exception(
+            raise LatticeTypeNotFound(
                 "Unsupported latice shape '%s'" % lattice)
 
 
@@ -75,6 +76,7 @@ class Lattice:
         dist = dist.reshape(self.n_rows * self.n_cols, self.n_rows, self.n_cols)
         return dist
 
+
 class HexaLattice(Lattice):
     name = "hexa"
 
@@ -94,8 +96,8 @@ class HexaLattice(Lattice):
     def generate_lattice(n_rows, n_cols):
         """
         Function in charge of generating the lattice coordinates.
-        :param rows: number of rows in the lattice (int)
-        :param cols: number of columns in the lattice (int)
+        :param n_rows: number of rows in the lattice (int)
+        :param n_cols: number of columns in the lattice (int)
         :return: list of coordinates (list)
         """
         x_coord = []
@@ -108,8 +110,6 @@ class HexaLattice(Lattice):
         coordinates[:, 1] = coordinates[:, 1] * np.sqrt(3) / np.sqrt(8) + 0.5
         coordinates[:, 0] = coordinates[:, 0] * np.sqrt(3) / 3
         return coordinates
-
-
 
     def are_neighbors(self, u1, u2):
         """
@@ -141,8 +141,8 @@ class RectLattice(Lattice):
     def generate_lattice(n_rows, n_cols):
         """
         Function in charge of generating the lattice coordinates.
-        :param rows: number of rows in the lattice (int)
-        :param cols: number of columns in the lattice (int)
+        :param n_rows: number of rows in the lattice (int)
+        :param n_cols: number of columns in the lattice (int)
         :return: list of coordinates (list)
         """
         x_coord = []

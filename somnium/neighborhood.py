@@ -2,6 +2,8 @@ import numpy as np
 import inspect
 import sys
 
+from somnium.exceptions import NeighborhoodFunctionNotFound
+
 epsilon = .000000000001
 
 
@@ -22,8 +24,7 @@ class NeighborhoodFactory(object):
                 if hasattr(obj, 'name') and neighborhood_func == obj.name:
                     return obj()
         else:
-            raise Exception(
-                "Unsupported neighborhood function '%s'" % neighborhood_func)
+            raise NeighborhoodFunctionNotFound("Unsupported neighborhood function '%s'" % neighborhood_func)
 
 
 class GaussianNeighborhood:
