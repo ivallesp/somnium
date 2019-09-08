@@ -21,3 +21,12 @@ def batching(list_of_iterables, n=1, infinite=False, return_incomplete_batches=F
 
         if not infinite:
             break
+
+
+def flatten(l):
+    """
+    Flattens a list of lists into a list
+    :param l: list to flatten (list)
+    :return:  list flattened (list)
+    """
+    return [item for sublist in l for item in sublist]
