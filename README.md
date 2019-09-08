@@ -1,4 +1,6 @@
 # _Somnium_: flexible Self-Organising Maps implementation
+[![Build Status](https://travis-ci.com/ivallesp/somnium.svg?branch=master)](https://travis-ci.com/ivallesp/somnium)
+[![Code coverage](https://codecov.io/gh/ivallesp/somnium/branch/master/graph/badge.svg)](https://codecov.io/gh/ivallesp/somnium)
 
 ## What is it?
 Somnium is a library intended for providing a easy and powerful way of exploring multi-dimensional data sets. It uses the Self-Organising Map algorithm (aka Kohonen map).
