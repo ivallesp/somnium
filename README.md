@@ -54,6 +54,7 @@ The API is currently being developed, which means that it is going to change fro
 
 ## Known issues
 - The current visualization engine only runs well under ``jupyter notebooks``. If you run it from a _python_ or _ipython_ console the figures will not look well.
+- Wider than higher maps (e.g. `mapsize=[10, 15]`) are not shown correctly.
 
 ## Contributing
 All contributions are welcome and appreciated. I don't have time to finish it soon so, please, feel free to open an issue to either propose some contribution or discuss potential new functionalities. All the contributions should be made through a _pull request_. 
