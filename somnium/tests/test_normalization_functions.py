@@ -1,8 +1,8 @@
 from unittest import TestCase
 import numpy as np
 
-from somnium.normalization import NormalizerFactory
-
+from somnium.normalization import NormalizerFactory, Normalizer
+from somnium.exceptions import NormalizationFunctionNotFound
 
 class TestNormalization(TestCase):
     def setUp(self):
@@ -128,3 +128,21 @@ class TestNormalization(TestCase):
 
         # The normalized_by and the normalized data are not the same
         self.assertTrue(np.sometrue(data_norm != data_norm_by))
+
+class TestNeighborhoodExceptions(TestCase):
+    def test_unrecognized_neighborhood_exception(self):
+        # Assure an exception is dropped when trying to calculate errors before training
+        self.assertRaises(NormalizationFunctionNotFound, NormalizerFactory.build, "foo")
+    def test_not_implemented_errors(self):
+        # Assure NotImplementedError is raised when a class does not have the proper methods defined.
+        class FooNormalizer(Normalizer):
+            pass
+        data = np.random.rand(1000, 10) * 7  # Mock data
+        data_aux = np.random.rand(1000, 10) * 7  # Mock data
+
+        self.assertRaises(NotImplementedError, FooNormalizer().normalize, data=data)
+        self.assertRaises(NotImplementedError, FooNormalizer().denormalize, data=data)
+        self.assertRaises(NotImplementedError, FooNormalizer().normalize_by, data=data, raw_data=data_aux)
+        self.assertRaises(NotImplementedError, FooNormalizer().denormalize_by, data=data, raw_data=data_aux)
+
+

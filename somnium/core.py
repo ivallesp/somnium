@@ -18,7 +18,7 @@ class SOM:
     def __init__(self, neighborhood="gaussian", normalization="standard", mapsize=(15, 10), lattice="hexa",
                  distance_metric="euclidean", n_jobs=1):
         """
-         Principal somnia class, in charge of training the Self Organizing Map.
+         Principal somnium class, in charge of training the Self Organizing Map.
         :param neighborhood: neighborhood function to use in the planar lattice. Supported functions are: 'gaussian'
         (default), 'bubble', 'cut_gaussian' and 'epanechicov'. (str)
         :param normalization: technique to use for normalization. Supported methods are: 'standard' (default), 'minmax',

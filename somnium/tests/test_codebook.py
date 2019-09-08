@@ -27,3 +27,11 @@ class TestCodebook(TestCase):
         self.assertEqual((42, 3), codebook.matrix.shape)
         self.assertLessEqual(0, codebook.matrix.min())
         self.assertGreaterEqual(1, codebook.matrix.max())
+
+    def test_pca_initialization_unitary_shape(self):
+        codebook = Codebook(mapsize=[1, 7], lattice="rect", distance_metric="euclidean")
+        codebook.pca_linear_initialization(data=np.random.rand(100, 3))
+        self.assertTrue(codebook.initialized)
+        self.assertEqual((7, 3), codebook.matrix.shape)
+        self.assertLessEqual(0, codebook.matrix.min())
+        self.assertGreaterEqual(1, codebook.matrix.max())
