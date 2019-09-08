@@ -125,3 +125,17 @@ class TestModelExceptions(TestCase):
                     distance_metric="euclidean", n_jobs=1)
 
         self.assertRaises(InvalidValuesInDataSet, model.fit, data=data, epochs=10, radiusin=10, radiusfin=3)
+
+    def test_infs_catching(self):
+        # Assure it drops an error when a Inf value is introduced in the data
+        data = np.random.rand(1000, 230)
+        data[25, 21] = np.Inf
+        model = SOM(neighborhood="gaussian", normalization="standard", mapsize=[15, 10], lattice="hexa",
+                    distance_metric="euclidean", n_jobs=1)
+        self.assertRaises(InvalidValuesInDataSet, model.fit, data=data, epochs=10, radiusin=10, radiusfin=3)
+
+        data = np.random.rand(1000, 230)
+        data[25, 21] = -np.Inf
+        model = SOM(neighborhood="gaussian", normalization="standard", mapsize=[15, 10], lattice="hexa",
+                    distance_metric="euclidean", n_jobs=1)
+        self.assertRaises(InvalidValuesInDataSet, model.fit, data=data, epochs=10, radiusin=10, radiusfin=3)

@@ -3,7 +3,7 @@ import numpy as np
 
 from somnium.neighborhood import NeighborhoodFactory
 from somnium.tests.util import non_increasing, strictly_decreasing
-
+from somnium.exceptions import NeighborhoodFunctionNotFound
 
 class TestNeighborhood(TestCase):
     def test_gaussian_neighborhood(self):
@@ -47,3 +47,9 @@ class TestNeighborhood(TestCase):
         self.assertTrue((neigh[x <= 5]>0).all())
         self.assertAlmostEqual(0, neigh[x >= 5].mean())
         self.assertLessEqual(0, neigh.min())
+
+
+class TestNeighborhoodExceptions(TestCase):
+    def test_unrecognized_neighborhood_exception(self):
+        # Assure an exception is dropped when trying to calculate errors before training
+        self.assertRaises(NeighborhoodFunctionNotFound, NeighborhoodFactory.build, "foo")

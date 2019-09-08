@@ -47,9 +47,6 @@ class GaussianNeighborhood:
         """
         return np.exp(-(distance_matrix**2)/(2.0*radius**2)).reshape(dim, dim)
 
-    def __call__(self, *args, **kwargs):
-        return self.calculate(*args, **kwargs)
-
 
 class BubbleNeighborhood:
     """
@@ -71,9 +68,6 @@ class BubbleNeighborhood:
         :return: distance matrix with the neighborhood function applied (np.array)
         """
         return np.where(distance_matrix > radius, 0.0, 1.0).reshape(dim, dim) + epsilon
-
-    def __call__(self, *args, **kwargs):
-        return self.calculate(*args, **kwargs)
 
 
 class CutGaussianNeighborhood:
@@ -100,9 +94,6 @@ class CutGaussianNeighborhood:
         gaussian[gaussian < threshold] = epsilon  # Cut at radius
         return gaussian
 
-    def __call__(self, *args, **kwargs):
-        return self.calculate(*args, **kwargs)
-
 
 class EpanechicovNeighborhood:
     """
@@ -123,6 +114,3 @@ class EpanechicovNeighborhood:
         :return: distance matrix with the neighborhood function applied (np.array)
         """
         return np.clip(1 - (distance_matrix/radius) ** 2, epsilon, None).reshape(dim, dim)
-
-    def __call__(self, *args, **kwargs):
-        return self.calculate(*args, **kwargs)
