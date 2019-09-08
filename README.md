@@ -1,7 +1,9 @@
-# _SOMnium_: flexible Self-Organising Maps implementation
+# _Somnium_: flexible Self-Organising Maps implementation
 
 ## What is it?
-A _Self-Organising Map_ (_SOM_ hereafter), is a biologically inspired algorithm meant for exploring multi-dimensional non-linear relations between variables. SOM was proposed in 1984 by Teuvo Kohonen, a Finnish academician. It is based in the process of task clustering that occurs in our brain and it is considered a type of neural network. It compresses the information of high-dimensional data into geometric relationships onto a low-dimensional representation.
+Somnium is a library intended for providing a easy and powerful way of exploring multi-dimensional data sets. It uses the Self-Organising Map algorithm (aka Kohonen map).
+ 
+ A _Self-Organising Map_ (_SOM_ hereafter), is a biologically inspired algorithm meant for exploring multi-dimensional non-linear relations between variables. SOM was proposed in 1984 by Teuvo Kohonen, a Finnish academician. It is based in the process of task clustering that occurs in our brain and it is considered a type of neural network. It compresses the information of high-dimensional data into geometric relationships onto a low-dimensional representation.
 
 ## Main aplications
 Here are just a few of the applications of SOM algorithm.
@@ -40,16 +42,13 @@ The API is currently being developed, which means that it is going to change fro
 ## Development lines
 - Integrate the visualization into the _SOM_ _API_.
 - Enhance the visualization _API_ with more OOP patterns.
-- Write a documentation and comment the code.
-- Write a proper unit-testing set.
+- Write a documentation page
 - Integrate with _Travis_.
 - Work on other installation methods.
 - Write at least one example for each application.
 - Research for and implement algorithm enhancements.
-- Improve error management, create an errors module for that purpose.
-    - ModelNotTrainedError
-    - [...]
 - Enhance reproducibility. Start by setting a seed.
+- Refactor plugins for always returning the figure, no `plt.show()
 
 ## Known issues
 - The current visualization engine only runs well under ``jupyter notebooks``. If you run it from a _python_ or _ipython_ console the figures will not look well.
