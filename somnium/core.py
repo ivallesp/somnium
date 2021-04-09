@@ -37,6 +37,7 @@ class SOM:
         self.codebook = Codebook(mapsize=mapsize, lattice=lattice, distance_metric=distance_metric)
         self.distance_matrix = self.codebook.lattice.distances.reshape(self.codebook.nnodes, self.codebook.nnodes)
         self.n_jobs = n_jobs
+        self.metric = distance_metric
         self.model_is_unfitted = True
         self.bmu = None
         self.data_norm = None
@@ -63,7 +64,28 @@ class SOM:
                              distance_matrix=self.distance_matrix,
                              distance_metric=self.codebook.lattice.distance_metric,
                              n_jobs=self.n_jobs)
+        # Update the bmus at the end
+        self.bmu = find_bmu(self.codebook,
+                            data_norm,
+                            metric=self.codebook.lattice.distance_metric,
+                            njb=self.n_jobs)
+
         return self
+
+    def predict(self, x):
+        """
+        Given a new dataset, if the model is trained, this function returns the
+        bmu indices corresponding with the input data points.
+        These indices correspond to the index over axis 0 of the self.codebook.matrix array
+        :param x: input data set to use for inference (np.array)
+
+        :returns: array of bmu indices (np.array)
+        """
+        if self.model_is_unfitted:
+            raise ModelNotTrainedError
+        x_norm = self.normalizer.normalize(x)
+        index, _ = find_bmu(codebook=self.codebook, input_matrix=x_norm, metric=self.metric)
+        return index.astype(int)
 
     def calculate_quantization_error(self):
         """
