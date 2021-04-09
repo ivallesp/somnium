@@ -32,7 +32,6 @@ def plot_components(model, names, colormap=plt.cm.jet, max_subplot_columns=5, fi
     fig = plt.figure(figsize=figsize, dpi=72)
     plot_map(codebook, titles=names, shape=subplots_shape, colormap=colormap, fig=fig,
              lattice=model.codebook.lattice.name, mode="color");
-    plt.show()
 
 
 def plot_bmus(model, figure_width=20):
@@ -43,18 +42,26 @@ def plot_bmus(model, figure_width=20):
     :return: None (void)
     """
     bmu_hits = calculate_bmus_matrix(model)
+    nrows = model.codebook.n_rows
+    ncols = model.codebook.n_columns
+    lattice=model.codebook.lattice.name
+    return _plot_bmus(bmu_hits=bmu_hits, nrows=nrows, ncols=ncols, lattice_name=lattice, figure_width=20)
+
+
+def _plot_bmus(bmu_hits, nrows, ncols, lattice_name, figure_width=20):
+
     subplot_cols = 1
     subplot_rows = 1
     subplots_shape = (subplot_rows, subplot_cols)
-    aspect_ratio = model.codebook.n_columns / model.codebook.n_rows
+    aspect_ratio = ncols / nrows
     xinch = figure_width
     comp_width = (figure_width / subplot_cols)
     yinch = comp_width * aspect_ratio * subplot_rows
     figsize = (xinch, yinch)
     fig = plt.figure(figsize=figsize, dpi=72.)
-    plot_map(bmu_hits, shape=subplots_shape, colormap=plt.cm.winter, fig=fig, lattice=model.codebook.lattice.name,
+    plot_map(bmu_hits, shape=subplots_shape, colormap=plt.cm.winter, fig=fig, lattice=lattice_name,
              mode="size")
-    plt.show()
+    return fig
 
 
 def plot_umatrix(model, colormap=plt.cm.hot, figure_width=20):
@@ -82,7 +89,6 @@ def plot_umatrix(model, colormap=plt.cm.hot, figure_width=20):
     fig = plt.figure(figsize=figsize, dpi=72.)
     plot_map(umat, shape=subplots_shape, colormap=colormap, fig=fig, lattice=model.codebook.lattice.name,
              mode="color")
-    plt.show()
 
 
 def plot_map(components_matrix,
@@ -206,9 +212,17 @@ def calculate_bmus_matrix(model):
     :param model: model which codebook will be used to calculate and represent the plot (somnia SOM model)
     :return: bmu_hits matrix (np.array)
     """
-    counts = Counter(model.bmu[0])
-    counts = [counts.get(x, 0) for x in range(model.codebook.nnodes)]
-    bmu_hits = np.array(counts).reshape(model.codebook.n_rows, model.codebook.n_columns)
+    bmu_list = model.bmu[0]
+    nrows = model.codebook.n_rows
+    ncols = model.codebook.n_columns
+    return _calculate_bmus_matrix(bmu_list, nrows, ncols)
+
+
+def _calculate_bmus_matrix(bmu_list, nrows, ncols):
+    nnodes = nrows*ncols
+    counts = Counter(bmu_list)
+    counts = [counts.get(x, 0) for x in range(nnodes)]
+    bmu_hits = np.array(counts).reshape(nrows, ncols)
     return bmu_hits
 
 
