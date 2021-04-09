@@ -41,6 +41,14 @@ class TestGeneralTraining(TestCase):
 
         self.assertGreater(f1_0, f1_1)
 
+    def test_predict(self):
+        data = np.random.rand(100, 10)
+        model = SOM(neighborhood="gaussian", normalization="standard", mapsize=[15, 10], lattice="hexa",
+                    distance_metric="euclidean", n_jobs=1)
+        model.fit(data, epochs=10, radiusin=10, radiusfin=3)
+        bmus_predict = model.predict(data)
+        self.assertTrue((model.bmu[0] == bmus_predict).all())
+
     def test_fit_different_parameters(self):
         # Check that the training process effectively reduces the errors for multiple metrics.
         # The criterion has been relaxed, we check the max(topographic_error, quantization_error) reduces
