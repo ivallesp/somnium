@@ -16,7 +16,7 @@ from somnium.exceptions import ModelNotTrainedError, InvalidValuesInDataSet
 
 class SOM:
     def __init__(self, neighborhood="gaussian", normalization="standard", mapsize=(15, 10), lattice="hexa",
-                 distance_metric="euclidean", n_jobs=1):
+                 distance_metric="euclidean", n_jobs=1, initialization="random"):
         """
          Principal somnium class, in charge of training the Self Organizing Map.
         :param neighborhood: neighborhood function to use in the planar lattice. Supported functions are: 'gaussian'
@@ -31,13 +31,17 @@ class SOM:
         'wminkowski'. More information here: https://docs.scipy.org/doc/scipy/reference/spatial.distance.html
         :param n_jobs: number of jobs to use for run the algorithm. Parallelization done when finding the BMUs, using
         multiprocessing library.
+        :param initialization: codebook initialization method. 'random' (default) or 'pca'. (str)
         """
+        if initialization not in ("random", "pca"):
+            raise ValueError(f"Unknown initialization method '{initialization}'. Use 'random' or 'pca'.")
         self.neighborhood_calculator = NeighborhoodFactory.build(neighborhood)
         self.normalizer = NormalizerFactory.build(normalization)
         self.codebook = Codebook(mapsize=mapsize, lattice=lattice, distance_metric=distance_metric)
         self.distance_matrix = self.codebook.lattice.distances.reshape(self.codebook.nnodes, self.codebook.nnodes)
         self.n_jobs = n_jobs
         self.metric = distance_metric
+        self.initialization = initialization
         self.model_is_unfitted = True
         self.bmu = None
         self.data_norm = None
@@ -57,7 +61,10 @@ class SOM:
         self.data_norm = data_norm
         _dlen = data_norm.shape[0]
         if self.model_is_unfitted:
-            self.codebook.random_initialization(data_norm)
+            if self.initialization == "pca":
+                self.codebook.pca_linear_initialization(data_norm)
+            else:
+                self.codebook.random_initialization(data_norm)
             self.model_is_unfitted = False
         self.bmu = train_som(data_norm, self.codebook, epochs, radiusin, radiusfin,
                              neighborhood_f=self.neighborhood_calculator,

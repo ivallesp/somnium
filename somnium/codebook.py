@@ -99,20 +99,12 @@ class Codebook(object):
         coord = (coord - .5)*2
         me = np.mean(data, 0)
         data = (data - me)
-        tmp_matrix = np.tile(me, (self.nnodes, 1))
 
-        # Randomized PCA is scalable
         pca = PCA(n_components=pca_components, svd_solver='randomized')
-
         pca.fit(data)
         eigvec = pca.components_
         eigval = pca.explained_variance_
-        norms = np.sqrt(np.einsum('ij,ij->i', eigvec, eigvec))
-        eigvec = ((eigvec.T/norms)*eigval).T
+        scaled_eigvec = eigvec * np.sqrt(eigval).reshape(-1, 1)
 
-        for j in range(self.nnodes):
-            for i in range(eigvec.shape[0]):
-                tmp_matrix[j, :] = tmp_matrix[j, :] + coord[j, i]*eigvec[i, :]
-
-        self.matrix = np.around(tmp_matrix, decimals=6)
+        self.matrix = np.around(me + coord @ scaled_eigvec, decimals=6)
         self.initialized = True
