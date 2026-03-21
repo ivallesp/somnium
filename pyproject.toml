@@ -1,0 +1,18 @@
+[project]
+name = "somnium"
+version = "0.0.0"
+description = "A versatile Self Organising Maps implementation in Python"
+authors = [
+    { name = "Iván Vallés Pérez", email = "ivanvallesperez@gmail.com" },
+]
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=1.16",
+    "scipy>=1.2",
+    "scikit-learn>=0.20",
+    "matplotlib>=3.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
