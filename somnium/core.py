@@ -106,7 +106,7 @@ class SOM:
                                        "method before calculating the quantization error.")
         neuron_values = self.codebook.matrix[find_bmu(self.codebook, self.data_norm,
                                                       metric=self.codebook.lattice.distance_metric)[0].astype(int)]
-        quantization_error = np.mean(np.abs(neuron_values - self.data_norm))
+        quantization_error = np.mean(np.sqrt(((neuron_values - self.data_norm) ** 2).sum(axis=1)))
         return quantization_error
 
     def calculate_topographic_error(self):
