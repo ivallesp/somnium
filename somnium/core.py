@@ -109,6 +109,18 @@ class SOM:
         quantization_error = np.mean(np.abs(neuron_values - self.data_norm))
         return quantization_error
 
+    def calculate_vacancy_rate(self):
+        """
+        Calculates the vacancy rate of the model, i.e. the percentage of neurons that have no data points assigned.
+        :return: the vacancy rate (float)
+        """
+        if self.model_is_unfitted:
+            raise ModelNotTrainedError("The codebook of the model has not been initialized, you must call the fit "
+                                       "method before calculating the vacancy rate.")
+        bmu_indices = self.bmu[0].astype(int)
+        n_active = len(np.unique(bmu_indices))
+        return 1 - n_active / self.codebook.nnodes
+
     def calculate_topographic_error(self):
         """
         Calculates the topographic error of the model, i.e. the percentage of instances for which the BMU and the

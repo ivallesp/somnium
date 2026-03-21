@@ -38,13 +38,14 @@ print(f"Genres: {len(set(genres))} unique")
 
 # %% Train SOM
 model = SOM(lattice="hexa", normalization="standard", distance_metric="euclidean",
-            neighborhood="gaussian", mapsize=[20, 20], n_jobs=1)
+            neighborhood="gaussian",mapsize=[20, 20], n_jobs=1)
 
 model.fit(data, 30, 20, 5)
 model.fit(data, 30, 5, 1)
 
 print("E_Quantization =", model.calculate_quantization_error())
 print("E_Topographic =", model.calculate_topographic_error())
+print("E_Vacancy =", model.calculate_vacancy_rate())
 
 if PLOT:
     plot_components(model, names, figure_width=30, max_subplot_columns=4)

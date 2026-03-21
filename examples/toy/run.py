@@ -34,6 +34,7 @@ model.fit(data, 30, 5, 1)
 print("=== LATTICE HEX ===")
 print("E_Quantization =", model.calculate_quantization_error())
 print("E_Topographic =", model.calculate_topographic_error())
+print("E_Vacancy =", model.calculate_vacancy_rate())
 
 if PLOT:
         plot_components(model, names, figure_width=30, max_subplot_columns=3)
@@ -67,6 +68,7 @@ model.fit(data, 30, 5, 3)
 print("=== LATTICE RECT ===")
 print("E_Quantization =", model.calculate_quantization_error())
 print("E_Topographic =", model.calculate_topographic_error())
+print("E_Vacancy =", model.calculate_vacancy_rate())
 
 if PLOT:
         plot_components(model=model, names=names, figure_width=30, max_subplot_columns=3)
