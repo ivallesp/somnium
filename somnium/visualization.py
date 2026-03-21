@@ -75,9 +75,9 @@ def plot_umatrix(model, colormap=plt.cm.hot, figure_width=20):
     :return: None (void)
     """
     codebook = model.codebook.matrix.reshape(model.codebook.n_rows, model.codebook.n_columns, -1)
-    if model.codebook.lattice.name == "rect":
+    if model.codebook.lattice.name.endswith("rect"):
         umat = calculate_umatrix_rect(codebook)
-    elif model.codebook.lattice.name == "hexa":
+    elif model.codebook.lattice.name.endswith("hexa"):
         umat = calculate_umatrix_hexa(codebook)
     subplot_cols = 1
     subplot_rows = 1
@@ -151,10 +151,10 @@ def plot_comp(component_matrix, title, ax, map_shape, colormap, lattice="hexa", 
     :return: axis of the last component and list of coordinates of the centers (tuple)
     """
     # describe rectangle or hexagon
-    if lattice == "hexa":
+    if lattice.endswith("hexa"):
         numsides = 6
         rotation = 0
-    elif lattice == "rect":
+    elif lattice.endswith("rect"):
         numsides = 4
         rotation = np.pi / 4
 
@@ -169,9 +169,9 @@ def plot_comp(component_matrix, title, ax, map_shape, colormap, lattice="hexa", 
     xpoints = coordinates[:, 0]
     ypoints = coordinates[:, 1]
     row_spacing = abs(ypoints[map_shape[1]] - ypoints[0])
-    if lattice == "hexa":
+    if lattice.endswith("hexa"):
         radius = row_spacing * 2 / 3
-    elif lattice == "rect":
+    elif lattice.endswith("rect"):
         radius = row_spacing / np.sqrt(2)
 
     if mode == "size":

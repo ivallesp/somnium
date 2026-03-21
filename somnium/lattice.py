@@ -76,6 +76,42 @@ class Lattice:
         dist = dist.reshape(self.n_rows * self.n_cols, self.n_rows, self.n_cols)
         return dist
 
+    def _compute_extents(self):
+        """Compute the periodic extent of the lattice in each dimension."""
+        coords = self.coordinates
+        unique_x = np.unique(np.round(coords[:, 0], 10))
+        unique_y = np.unique(np.round(coords[:, 1], 10))
+        step_x = np.min(np.diff(unique_x)) if len(unique_x) > 1 else 1.0
+        step_y = np.min(np.diff(unique_y)) if len(unique_y) > 1 else 1.0
+        self._extent_x = np.max(coords[:, 0]) - np.min(coords[:, 0]) + step_x
+        self._extent_y = np.max(coords[:, 1]) - np.min(coords[:, 1]) + step_y
+
+    def _compute_wrapped_distance_matrix(self, wrap_rows, wrap_cols):
+        """Compute pairwise distance matrix with wrapping in specified dimensions."""
+        self._compute_extents()
+        coords = self.coordinates
+        n = len(coords)
+        dist = np.zeros((n, n))
+        for i in range(n):
+            dx = np.abs(coords[i, 0] - coords[:, 0])
+            dy = np.abs(coords[i, 1] - coords[:, 1])
+            if wrap_rows:
+                dx = np.minimum(dx, self._extent_x - dx)
+            if wrap_cols:
+                dy = np.minimum(dy, self._extent_y - dy)
+            dist[i] = np.sqrt(dx ** 2 + dy ** 2)
+        return dist.reshape(self.n_rows * self.n_cols, self.n_rows, self.n_cols)
+
+    def _wrapped_distance(self, u1, u2, wrap_rows, wrap_cols):
+        """Euclidean distance between two points with optional wrapping."""
+        dx = abs(u1[0] - u2[0])
+        dy = abs(u1[1] - u2[1])
+        if wrap_rows:
+            dx = min(dx, self._extent_x - dx)
+        if wrap_cols:
+            dy = min(dy, self._extent_y - dy)
+        return np.sqrt(dx ** 2 + dy ** 2)
+
 
 class HexaLattice(Lattice):
     name = "hexa"
@@ -112,13 +148,7 @@ class HexaLattice(Lattice):
         return coordinates
 
     def are_neighbors(self, u1, u2):
-        """
-        Determines if two units are neighbors. In that case it returns True, otherwise it returns False
-        :param u1: coordinates of the first unit (int)
-        :param u2: coordinates of the second unit (init)
-        :return: boolean value indicating if the units are neighbors (bool)
-        """
-        l2 = np.sqrt((u1[0] - u2[0]) ** 2 + (u1[1] - u2[1]) ** 2)  # Euclidean distance
+        l2 = np.sqrt((u1[0] - u2[0]) ** 2 + (u1[1] - u2[1]) ** 2)
         return l2 <= (1 + epsilon)
 
 
@@ -163,3 +193,43 @@ class RectLattice(Lattice):
         """
         l2 = np.sqrt((u1[0] - u2[0]) ** 2 + (u1[1] - u2[1]) ** 2)  # Euclidean distance
         return l2 <= (1 + epsilon)
+
+
+class ToroidalHexaLattice(HexaLattice):
+    name = "toroidal_hexa"
+
+    def compute_distance_matrix(self, distance_metric):
+        return self._compute_wrapped_distance_matrix(wrap_rows=True, wrap_cols=True)
+
+    def are_neighbors(self, u1, u2):
+        return self._wrapped_distance(u1, u2, wrap_rows=True, wrap_cols=True) <= (1 + epsilon)
+
+
+class ToroidalRectLattice(RectLattice):
+    name = "toroidal_rect"
+
+    def compute_distance_matrix(self, distance_metric):
+        return self._compute_wrapped_distance_matrix(wrap_rows=True, wrap_cols=True)
+
+    def are_neighbors(self, u1, u2):
+        return self._wrapped_distance(u1, u2, wrap_rows=True, wrap_cols=True) <= (1 + epsilon)
+
+
+class CylindricalHexaLattice(HexaLattice):
+    name = "cylindrical_hexa"
+
+    def compute_distance_matrix(self, distance_metric):
+        return self._compute_wrapped_distance_matrix(wrap_rows=False, wrap_cols=True)
+
+    def are_neighbors(self, u1, u2):
+        return self._wrapped_distance(u1, u2, wrap_rows=False, wrap_cols=True) <= (1 + epsilon)
+
+
+class CylindricalRectLattice(RectLattice):
+    name = "cylindrical_rect"
+
+    def compute_distance_matrix(self, distance_metric):
+        return self._compute_wrapped_distance_matrix(wrap_rows=False, wrap_cols=True)
+
+    def are_neighbors(self, u1, u2):
+        return self._wrapped_distance(u1, u2, wrap_rows=False, wrap_cols=True) <= (1 + epsilon)
