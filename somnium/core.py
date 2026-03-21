@@ -14,6 +14,28 @@ from somnium.util import batching
 from somnium.exceptions import ModelNotTrainedError, InvalidValuesInDataSet
 
 
+def estimate_mapsize(data):
+    """
+    Estimates a good map size for the given data using a heuristic: total neurons ≈ 5 * sqrt(N),
+    aspect ratio derived from the ratio of the first two PCA eigenvalues.
+    :param data: input data matrix (np.array)
+    :return: (n_rows, n_columns) tuple
+    """
+    from sklearn.decomposition import PCA
+    n_samples = data.shape[0]
+    total_neurons = int(5 * np.sqrt(n_samples))
+    if data.shape[1] >= 2:
+        pca = PCA(n_components=2, svd_solver='randomized')
+        pca.fit(data)
+        ratio = pca.explained_variance_[0] / max(pca.explained_variance_[1], 1e-10)
+        aspect = np.sqrt(ratio)
+    else:
+        aspect = 1.0
+    n_cols = max(1, int(np.sqrt(total_neurons * aspect)))
+    n_rows = max(1, int(total_neurons / n_cols))
+    return (n_rows, n_cols)
+
+
 class SOM:
     def __init__(self, neighborhood="gaussian", normalization="standard", mapsize=(15, 10), lattice="hexa",
                  distance_metric="euclidean", n_jobs=1, initialization="random"):
@@ -23,7 +45,7 @@ class SOM:
         (default), 'bubble', 'cut_gaussian' and 'epanechicov'. (str)
         :param normalization: technique to use for normalization. Supported methods are: 'standard' (default), 'minmax',
         'boxcox', 'logistic'. (str)
-        :param mapsize: size of the component matrices (tuple or iterable)
+        :param mapsize: size of the component matrices (tuple or iterable), or 'auto' to estimate from data on first fit
         :param lattice: type of lattice: 'rect' or 'hexa' for rectangular and hexagonal lattices (str).
         :param distance_metric: distance metric to be used in all the operations (str). The supported distance metrics
         are the same ones as the supported by scipy: 'braycurtis', 'canberra', 'chebyshev', 'cityblock', 'correlation',
@@ -37,14 +59,21 @@ class SOM:
             raise ValueError(f"Unknown initialization method '{initialization}'. Use 'random' or 'pca'.")
         self.neighborhood_calculator = NeighborhoodFactory.build(neighborhood)
         self.normalizer = NormalizerFactory.build(normalization)
-        self.codebook = Codebook(mapsize=mapsize, lattice=lattice, distance_metric=distance_metric)
-        self.distance_matrix = self.codebook.lattice.distances.reshape(self.codebook.nnodes, self.codebook.nnodes)
+        self._mapsize = mapsize
+        self._lattice = lattice
+        self._distance_metric = distance_metric
+        if mapsize != "auto":
+            self._init_codebook(mapsize, lattice, distance_metric)
         self.n_jobs = n_jobs
         self.metric = distance_metric
         self.initialization = initialization
         self.model_is_unfitted = True
         self.bmu = None
         self.data_norm = None
+
+    def _init_codebook(self, mapsize, lattice, distance_metric):
+        self.codebook = Codebook(mapsize=mapsize, lattice=lattice, distance_metric=distance_metric)
+        self.distance_matrix = self.codebook.lattice.distances.reshape(self.codebook.nnodes, self.codebook.nnodes)
 
     def fit(self, data, epochs, radiusin, radiusfin):
         """
@@ -61,6 +90,8 @@ class SOM:
         self.data_norm = data_norm
         _dlen = data_norm.shape[0]
         if self.model_is_unfitted:
+            if self._mapsize == "auto":
+                self._init_codebook(estimate_mapsize(data_norm), self._lattice, self._distance_metric)
             if self.initialization == "pca":
                 self.codebook.pca_linear_initialization(data_norm)
             else:
