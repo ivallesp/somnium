@@ -11,8 +11,14 @@ dependencies = [
     "scipy>=1.2",
     "scikit-learn>=0.20",
     "matplotlib>=3.0",
+    "pandas>=3.0.1",
 ]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
