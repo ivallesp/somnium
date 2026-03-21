@@ -25,25 +25,26 @@ uv sync
 from somnium.core import SOM
 
 model = SOM(
-    mapsize="auto",           # or (15, 10)
-    lattice="hexa",           # "hexa" or "rect"
-    neighborhood="gaussian",  # "gaussian", "bubble", "cut_gaussian", "epanechicov"
-    normalization="standard", # "standard", "minmax", "log", "logistic", "boxcox"
-    initialization="pca",     # "pca" or "random"
-    distance_metric="euclidean",
+    mapsize="auto",              # or (15, 10); auto estimates from data
+    lattice="hexa",              # "hexa", "rect", "toroidal_hexa", "toroidal_rect",
+                                 # "cylindrical_hexa", "cylindrical_rect"
+    neighborhood="gaussian",     # "gaussian", "bubble", "cut_gaussian", "epanechicov"
+    normalization="standard",    # "standard", "minmax", "log", "logistic", "boxcox"
+    initialization="pca",        # "pca" or "random"
+    distance_metric="euclidean", # any scipy distance metric
 )
 
-# Two-phase training (rough + fine)
-model.fit(data, epochs=30, radiusin=20, radiusfin=5)
-model.fit(data, epochs=30, radiusin=5,  radiusfin=1)
+# Two-phase training (rough + fine), with optional exponential decay
+model.fit(data, epochs=30, radiusin=20, radiusfin=5, decay="linear")
+model.fit(data, epochs=30, radiusin=5,  radiusfin=1, decay="exponential")
 
-# Or use the convenience method
+# Or use the convenience method (auto radii from map size)
 model.fit_auto(data)
 
 # Metrics (lower is better for all)
-model.calculate_quantization_error()
-model.calculate_topographic_error()
-model.calculate_vacancy_rate()
+model.calculate_quantization_error()  # per-feature MAE
+model.calculate_topographic_error()   # fraction with non-adjacent BMUs
+model.calculate_vacancy_rate()        # fraction of unused neurons
 
 # Predict BMUs for new data
 bmus = model.predict(new_data)
@@ -60,14 +61,14 @@ plot_umatrix(model)
 ```
 
 ## Features
-- **Lattices**: hexagonal, rectangular
+- **Lattices**: hexagonal, rectangular — flat, toroidal (both axes wrap), or cylindrical (columns wrap)
 - **Neighborhoods**: Gaussian, bubble, cut Gaussian, Epanechicov
 - **Normalization**: standard, min-max, log, logistic, Box-Cox
 - **Initialization**: random, PCA
-- **Radius decay**: linear, exponential
-- **Map size**: manual or auto-estimated from data
+- **Training**: multi-phase with linear or exponential radius decay; `fit_auto()` convenience method
+- **Map size**: manual or auto-estimated from data (5*sqrt(N) heuristic with PCA aspect ratio)
 - **Metrics**: quantization error (MAE), topographic error, vacancy rate
-- **Visualization**: component planes, U-matrix, BMU hit maps
+- **Visualization**: component planes, U-matrix, BMU hit maps (hexagonal and rectangular)
 
 ## Examples
 
@@ -76,17 +77,6 @@ See the `examples/` folder for complete examples on real datasets:
 - `spotify/` — Spotify audio features (114k tracks)
 - `happiness/` — World Happiness Report (2015-2022)
 - `creditcard/` — credit card fraud detection
-
-## Autoresearch
-
-The `autoresearch/` folder contains a setup for automated SOM hyperparameter optimization:
-- `prepare.py` — downloads and processes all datasets (run once)
-- `train.py` — trains SOMs on all datasets, prints metrics. This is the only file an agent modifies.
-
-```bash
-uv run python autoresearch/prepare.py
-uv run python autoresearch/train.py
-```
 
 ## Tests
 
