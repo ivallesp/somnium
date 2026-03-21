@@ -4,7 +4,8 @@ import logging
 import numpy as np
 from scipy import signal
 from matplotlib import cm, pyplot as plt
-from matplotlib.collections import RegularPolyCollection
+from matplotlib.patches import RegularPolygon
+from matplotlib.collections import PatchCollection
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from somnium.lattice import LatticeFactory
 
@@ -151,13 +152,11 @@ def plot_comp(component_matrix, title, ax, map_shape, colormap, lattice="hexa", 
     """
     # describe rectangle or hexagon
     if lattice == "hexa":
-        radius_f = lambda x: x * 2 / 3
-        rotation = 0
         numsides = 6
+        rotation = 0
     elif lattice == "rect":
-        radius_f = lambda x: x / np.sqrt(2)
-        rotation = np.pi / 4
         numsides = 4
+        rotation = np.pi / 4
 
     coordinates = LatticeFactory.build(lattice).generate_lattice(*map_shape[:2])
     # Sort to draw left-right top-bottom
@@ -166,37 +165,33 @@ def plot_comp(component_matrix, title, ax, map_shape, colormap, lattice="hexa", 
     coordinates = coordinates[np.lexsort([-coordinates[:, 0], -coordinates[:, 1]])]
     coordinates[:, 1] = -coordinates[:, 1]
 
-    # Get pixel size between two data points
+    # Compute radius in data coordinates from spacing between adjacent rows
     xpoints = coordinates[:, 0]
     ypoints = coordinates[:, 1]
-    ax.scatter(xpoints, ypoints, s=0.0, marker='s')
-    ax.axis([min(xpoints) - 1., max(xpoints) + 1.,
-             min(ypoints) - 1., max(ypoints) + 1.])
-    xy_pixels = ax.transData.transform(np.vstack([xpoints, ypoints]).T)
-    xpix, ypix = xy_pixels.T
-    radius = radius_f(abs(ypix[map_shape[1]] - ypix[0]))
+    row_spacing = abs(ypoints[map_shape[1]] - ypoints[0])
+    if lattice == "hexa":
+        radius = row_spacing * 2 / 3
+    elif lattice == "rect":
+        radius = row_spacing / np.sqrt(2)
 
-    area_inner_circle = math.pi * (radius ** 2)
-
-    if mode == "color":
-        sizes = [area_inner_circle] * component_matrix.shape[0]
-    elif mode == "size":
-        sizes = area_inner_circle * (component_matrix.reshape(-1) / component_matrix.max())
+    if mode == "size":
+        scale = component_matrix.reshape(-1) / component_matrix.max()
         component_matrix = component_matrix * 0
+    else:
+        scale = np.ones(component_matrix.shape[0])
 
-    collection_bg = RegularPolyCollection(
-        numsides=numsides,  # a hexagon
-        rotation=rotation,
-        sizes=sizes,
-        array=component_matrix,
-        cmap=colormap,
-        offsets=coordinates,
-        transOffset=ax.transData,
-    )
-    ax.add_collection(collection_bg, autolim=True)
+    patches = []
+    for i, (xy, s) in enumerate(zip(coordinates, scale)):
+        patches.append(RegularPolygon(xy, numVertices=numsides, radius=radius * np.sqrt(s),
+                                      orientation=rotation))
+    collection_bg = PatchCollection(patches, cmap=colormap, match_original=False)
+    collection_bg.set_array(component_matrix)
+    ax.add_collection(collection_bg)
 
+    ax.set_xlim(min(xpoints) - 1., max(xpoints) + 1.)
+    ax.set_ylim(min(ypoints) - 1., max(ypoints) + 1.)
+    ax.set_aspect('equal')
     ax.axis('off')
-    ax.autoscale_view()
     ax.set_title(title)
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
