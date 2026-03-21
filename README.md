@@ -98,4 +98,4 @@ uv run python -m pytest somnium/tests/ -v
 This library was built using [SOMPY](https://github.com/sevamoo/SOMPY) as a starting point.
 
 ## License
-MIT. See `LICENSE`. Copyright (c) 2019 Iván Vallés Pérez
+MIT. See `LICENSE`. Copyright (c) 2019-2026 Iván Vallés Pérez
