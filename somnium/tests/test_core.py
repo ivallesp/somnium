@@ -2,7 +2,7 @@ from unittest import TestCase
 import numpy as np
 import random
 
-from somnium.core import SOM, find_bmu
+from somnium.core import SOM, find_bmu, estimate_mapsize
 from somnium.exceptions import ModelNotTrainedError, InvalidValuesInDataSet
 
 
@@ -147,3 +147,91 @@ class TestModelExceptions(TestCase):
         model = SOM(neighborhood="gaussian", normalization="standard", mapsize=[15, 10], lattice="hexa",
                     distance_metric="euclidean", n_jobs=1)
         self.assertRaises(InvalidValuesInDataSet, model.fit, data=data, epochs=10, radiusin=10, radiusfin=3)
+
+
+class TestAutoMapsize(TestCase):
+    def test_estimate_mapsize_returns_tuple(self):
+        data = np.random.rand(1000, 10)
+        ms = estimate_mapsize(data)
+        self.assertIsInstance(ms, tuple)
+        self.assertEqual(len(ms), 2)
+        self.assertGreater(ms[0], 0)
+        self.assertGreater(ms[1], 0)
+
+    def test_auto_mapsize_in_som(self):
+        data = np.random.rand(500, 5)
+        model = SOM(mapsize="auto")
+        model.fit(data, epochs=5, radiusin=10, radiusfin=3)
+        self.assertGreater(model.codebook.n_rows, 0)
+        self.assertGreater(model.codebook.n_columns, 0)
+
+    def test_larger_data_gives_larger_map(self):
+        small = estimate_mapsize(np.random.rand(100, 5))
+        large = estimate_mapsize(np.random.rand(10000, 5))
+        self.assertGreater(large[0] * large[1], small[0] * small[1])
+
+
+class TestExponentialDecay(TestCase):
+    def test_exponential_decay_trains(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(10, 10))
+        model.fit(data, epochs=10, radiusin=10, radiusfin=1, decay="exponential")
+        qe = model.calculate_quantization_error()
+        self.assertGreater(qe, 0)
+
+
+class TestFitAuto(TestCase):
+    def test_fit_auto_trains(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(10, 10))
+        model.fit_auto(data)
+        qe = model.calculate_quantization_error()
+        te = model.calculate_topographic_error()
+        self.assertGreater(qe, 0)
+        self.assertGreater(te, 0)
+
+    def test_fit_auto_with_auto_mapsize(self):
+        data = np.random.rand(500, 5)
+        model = SOM(mapsize="auto")
+        model.fit_auto(data)
+        self.assertGreater(model.codebook.n_rows, 0)
+
+
+class TestVacancyRate(TestCase):
+    def test_vacancy_rate_range(self):
+        data = np.random.rand(500, 5)
+        model = SOM(mapsize=(10, 10))
+        model.fit(data, epochs=10, radiusin=10, radiusfin=3)
+        vr = model.calculate_vacancy_rate()
+        self.assertGreaterEqual(vr, 0.0)
+        self.assertLessEqual(vr, 1.0)
+
+    def test_vacancy_rate_unfitted_raises(self):
+        model = SOM(mapsize=(10, 10))
+        self.assertRaises(ModelNotTrainedError, model.calculate_vacancy_rate)
+
+
+class TestPCAInitialization(TestCase):
+    def test_pca_init_trains(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(10, 10), initialization="pca")
+        model.fit(data, epochs=10, radiusin=10, radiusfin=3)
+        qe = model.calculate_quantization_error()
+        self.assertGreater(qe, 0)
+
+    def test_invalid_initialization_raises(self):
+        self.assertRaises(ValueError, SOM, initialization="invalid")
+
+
+class TestToroidalTraining(TestCase):
+    def test_toroidal_hexa_trains(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(10, 10), lattice="toroidal_hexa")
+        model.fit(data, epochs=10, radiusin=10, radiusfin=3)
+        self.assertGreater(model.calculate_quantization_error(), 0)
+
+    def test_cylindrical_rect_trains(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(10, 10), lattice="cylindrical_rect")
+        model.fit(data, epochs=10, radiusin=10, radiusfin=3)
+        self.assertGreater(model.calculate_quantization_error(), 0)

@@ -106,3 +106,89 @@ class TestHexaLattice(TestCase):
         center = 15
         neighbors = [8, 9, 14, 16, 22, 23]
         self.assertTrue(all([lat.are_neighbor_indices(center, n) for n in neighbors]))
+
+
+class TestToroidalRectLattice(TestCase):
+    def test_dimension(self):
+        lat = LatticeFactory.build("toroidal_rect")(n_rows=4, n_cols=5, distance_metric="euclidean")
+        self.assertEqual(20, len(lat.coordinates))
+
+    def test_wrapping_neighbors(self):
+        # In a toroidal rect, edge nodes wrap to the opposite edge
+        lat = LatticeFactory.build("toroidal_rect")(n_rows=4, n_cols=5, distance_metric="euclidean")
+        # Node 0 (row=0, col=0) should be neighbor of node 4 (row=0, col=4) via column wrap
+        self.assertTrue(lat.are_neighbor_indices(0, 4))
+        # Node 0 (row=0, col=0) should be neighbor of node 15 (row=3, col=0) via row wrap
+        self.assertTrue(lat.are_neighbor_indices(0, 15))
+
+    def test_more_neighbors_than_flat(self):
+        # Corner nodes in toroidal should have more neighbors than in flat
+        flat = LatticeFactory.build("rect")(n_rows=4, n_cols=5, distance_metric="euclidean")
+        toro = LatticeFactory.build("toroidal_rect")(n_rows=4, n_cols=5, distance_metric="euclidean")
+        # Node 0 is a corner: 2 neighbors flat, 4 neighbors toroidal
+        flat_n = sum(flat.are_neighbor_indices(0, j) for j in range(1, 20))
+        toro_n = sum(toro.are_neighbor_indices(0, j) for j in range(1, 20))
+        self.assertGreater(toro_n, flat_n)
+
+    def test_all_nodes_same_neighbor_count(self):
+        # In a toroidal rect lattice, every node should have exactly 4 neighbors
+        lat = LatticeFactory.build("toroidal_rect")(n_rows=4, n_cols=5, distance_metric="euclidean")
+        n = lat.n_rows * lat.n_cols
+        for i in range(n):
+            count = sum(lat.are_neighbor_indices(i, j) for j in range(n) if j != i)
+            self.assertEqual(4, count, f"Node {i} has {count} neighbors, expected 4")
+
+
+class TestToroidalHexaLattice(TestCase):
+    def test_dimension(self):
+        lat = LatticeFactory.build("toroidal_hexa")(n_rows=4, n_cols=5, distance_metric="euclidean")
+        self.assertEqual(20, len(lat.coordinates))
+
+    def test_more_neighbors_than_flat(self):
+        flat = LatticeFactory.build("hexa")(n_rows=4, n_cols=5, distance_metric="euclidean")
+        toro = LatticeFactory.build("toroidal_hexa")(n_rows=4, n_cols=5, distance_metric="euclidean")
+        # Corner node should gain neighbors from wrapping
+        flat_n = sum(flat.are_neighbor_indices(0, j) for j in range(1, 20))
+        toro_n = sum(toro.are_neighbor_indices(0, j) for j in range(1, 20))
+        self.assertGreaterEqual(toro_n, flat_n)
+
+    def test_wrapped_distance_shorter(self):
+        # Wrapped distance between opposite corners should be shorter than flat
+        flat = LatticeFactory.build("hexa")(n_rows=6, n_cols=6, distance_metric="euclidean")
+        toro = LatticeFactory.build("toroidal_hexa")(n_rows=6, n_cols=6, distance_metric="euclidean")
+        flat_dist = flat.distances.reshape(36, 36)[0, 35]
+        toro_dist = toro.distances.reshape(36, 36)[0, 35]
+        self.assertLess(toro_dist, flat_dist)
+
+
+class TestCylindricalRectLattice(TestCase):
+    def test_dimension(self):
+        lat = LatticeFactory.build("cylindrical_rect")(n_rows=4, n_cols=5, distance_metric="euclidean")
+        self.assertEqual(20, len(lat.coordinates))
+
+    def test_column_wrapping(self):
+        # Columns wrap: node 0 (row=0,col=0) neighbors node 4 (row=0,col=4)
+        lat = LatticeFactory.build("cylindrical_rect")(n_rows=4, n_cols=5, distance_metric="euclidean")
+        self.assertTrue(lat.are_neighbor_indices(0, 4))
+
+    def test_rows_do_not_wrap(self):
+        # Rows do NOT wrap: node 0 (row=0,col=0) is NOT neighbor of node 15 (row=3,col=0)
+        lat = LatticeFactory.build("cylindrical_rect")(n_rows=4, n_cols=5, distance_metric="euclidean")
+        self.assertFalse(lat.are_neighbor_indices(0, 15))
+
+
+class TestCylindricalHexaLattice(TestCase):
+    def test_dimension(self):
+        lat = LatticeFactory.build("cylindrical_hexa")(n_rows=4, n_cols=5, distance_metric="euclidean")
+        self.assertEqual(20, len(lat.coordinates))
+
+    def test_partial_wrapping(self):
+        # Cylindrical should have more neighbors than flat but fewer than toroidal for corner nodes
+        flat = LatticeFactory.build("hexa")(n_rows=4, n_cols=5, distance_metric="euclidean")
+        cyl = LatticeFactory.build("cylindrical_hexa")(n_rows=4, n_cols=5, distance_metric="euclidean")
+        toro = LatticeFactory.build("toroidal_hexa")(n_rows=4, n_cols=5, distance_metric="euclidean")
+        flat_n = sum(flat.are_neighbor_indices(0, j) for j in range(1, 20))
+        cyl_n = sum(cyl.are_neighbor_indices(0, j) for j in range(1, 20))
+        toro_n = sum(toro.are_neighbor_indices(0, j) for j in range(1, 20))
+        self.assertGreaterEqual(cyl_n, flat_n)
+        self.assertGreaterEqual(toro_n, cyl_n)
