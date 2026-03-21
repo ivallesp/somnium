@@ -25,7 +25,7 @@ def plot_components(model, names, colormap=plt.cm.jet, max_subplot_columns=5, fi
     subplot_cols = min(codebook.shape[-1], max_subplot_columns)
     subplot_rows = math.ceil(codebook.shape[-1] / subplot_cols)
     subplots_shape = [subplot_rows, subplot_cols]
-    aspect_ratio = model.codebook.n_columns / model.codebook.n_rows
+    aspect_ratio = model.codebook.n_rows / model.codebook.n_columns
     xinch = figure_width
     comp_width = (figure_width / subplot_cols)
     yinch = comp_width * aspect_ratio * subplot_rows
@@ -46,7 +46,7 @@ def plot_bmus(model, figure_width=20):
     nrows = model.codebook.n_rows
     ncols = model.codebook.n_columns
     lattice=model.codebook.lattice.name
-    return _plot_bmus(bmu_hits=bmu_hits, nrows=nrows, ncols=ncols, lattice_name=lattice, figure_width=20)
+    return _plot_bmus(bmu_hits=bmu_hits, nrows=nrows, ncols=ncols, lattice_name=lattice, figure_width=figure_width)
 
 
 def _plot_bmus(bmu_hits, nrows, ncols, lattice_name, figure_width=20):
@@ -54,7 +54,7 @@ def _plot_bmus(bmu_hits, nrows, ncols, lattice_name, figure_width=20):
     subplot_cols = 1
     subplot_rows = 1
     subplots_shape = (subplot_rows, subplot_cols)
-    aspect_ratio = ncols / nrows
+    aspect_ratio = nrows / ncols
     xinch = figure_width
     comp_width = (figure_width / subplot_cols)
     yinch = comp_width * aspect_ratio * subplot_rows
@@ -82,7 +82,7 @@ def plot_umatrix(model, colormap=plt.cm.hot, figure_width=20):
     subplot_cols = 1
     subplot_rows = 1
     subplots_shape = (subplot_rows, subplot_cols)
-    aspect_ratio = umat.shape[1] / umat.shape[0]
+    aspect_ratio = umat.shape[0] / umat.shape[1]
     xinch = figure_width
     comp_width = (figure_width / subplot_cols)
     yinch = comp_width * aspect_ratio * subplot_rows
@@ -237,7 +237,8 @@ def calculate_umatrix_rect(codebook):
                        [0, 1, 0]])
     out = signal.convolve2d(UMatrix, kernel, boundary='fill', mode='same')
     out = out / signal.convolve2d(np.ones_like(UMatrix), kernel, boundary='fill', mode='same')
-    UMatrix = UMatrix + out
+    mask = (UMatrix == 0)
+    UMatrix[mask] = out[mask]
     return UMatrix
 
 
@@ -248,9 +249,8 @@ def calculate_umatrix_hexa(codebook):
     :return: U-Matrix (np.array)
     """
     UMatrix = np.zeros((codebook.shape[0] + codebook.shape[0] - 1, codebook.shape[1] + codebook.shape[1]))
-    # Mark neurons
-    UMatrix[::4,1::2] = -3
-    UMatrix[2::4,::2] = -3
+    # Track which cells have been filled with valid distance data
+    filled = np.zeros_like(UMatrix, dtype=bool)
 
     # Diagonal lefts
     diag_left_odd = np.sqrt(
@@ -258,7 +258,9 @@ def calculate_umatrix_hexa(codebook):
     diag_left_even = np.sqrt(((codebook[1:-1:2,1:] - codebook[2::2,:-1])**2).sum(axis=-1))
     diag_left_even = np.column_stack([np.zeros([diag_left_even.shape[0], 1]), diag_left_even])
     UMatrix[3::4,::2] = diag_left_even
+    filled[3::4,::2] = True
     UMatrix[1::4,1::2] = diag_left_odd
+    filled[1::4,1::2] = True
 
     # Diagonal right
     diag_right_odd = np.sqrt(
@@ -266,42 +268,51 @@ def calculate_umatrix_hexa(codebook):
     diag_right_odd = np.column_stack([np.zeros([diag_right_odd.shape[0], 1]), diag_right_odd])
     diag_right_even = np.sqrt(((codebook[1:-1:2] - codebook[2::2])**2).sum(axis=-1))
     UMatrix[1::4,::2] = diag_right_odd
+    filled[1::4,::2] = True
     UMatrix[3::4,1::2] = diag_right_even
+    filled[3::4,1::2] = True
 
     # Sides
     sides =  np.sqrt(((codebook[:,1:] - codebook[:,:-1])**2).sum(axis=-1))
     sides = np.array([[0.0] + x.tolist() if (i%2 == 0) else x.tolist()+[0.0] for i,x in enumerate(sides)])
     UMatrix[::4,::2] = sides[::2]
+    filled[::4,::2] = True
     UMatrix[2::4,1::2] = sides[1::2]
+    filled[2::4,1::2] = True
 
     # Odds conv
     kernel = np.array([[1, 1, 0],   # Kernel to fill the gaps with sum of neighbors
                        [1, 0, 1],
                        [1, 1, 0]])
     out = signal.convolve2d(UMatrix, kernel, boundary='fill', mode='same')
-    count_mat = np.ones_like(UMatrix)
-    count_mat[UMatrix==0]=0
-    out = out / signal.convolve2d(count_mat, kernel, boundary='fill', mode='same')
+    count_mat = filled.astype(float)
+    denom = signal.convolve2d(count_mat, kernel, boundary='fill', mode='same')
+    denom[denom == 0] = 1
+    out = out / denom
     UMatrix[::4, 1::2] = out[::4, 1::2]
+    filled[::4, 1::2] = True
 
     # Evens conv
     kernel = np.array([[0, 1, 1],   # Kernel to fill the gaps with sum of neighbors
                        [1, 0, 1],
                        [0, 1, 1]])
     out = signal.convolve2d(UMatrix, kernel, boundary='fill', mode='same')
-    count_mat = np.ones_like(UMatrix)
-    count_mat[UMatrix==0]=0
-    out = out / signal.convolve2d(count_mat, kernel, boundary='fill', mode='same')
+    count_mat = filled.astype(float)
+    denom = signal.convolve2d(count_mat, kernel, boundary='fill', mode='same')
+    denom[denom == 0] = 1
+    out = out / denom
     UMatrix[2::4, ::2] = out[2::4, ::2]
+    filled[2::4, ::2] = True
 
     # Filling the voids #0
     kernel = np.array([[0, 1, 1],   # Kernel to fill the gaps with sum of neighbors
                        [1, 0, 1],
                        [0, 1, 1]])
     out = signal.convolve2d(UMatrix, kernel, boundary='fill', mode='same')
-    count_mat = np.ones_like(UMatrix)
-    count_mat[UMatrix==0]=0
-    out = out / signal.convolve2d(count_mat, kernel, boundary='fill', mode='same')
+    count_mat = filled.astype(float)
+    denom = signal.convolve2d(count_mat, kernel, boundary='fill', mode='same')
+    denom[denom == 0] = 1
+    out = out / denom
     UMatrix[::2, 0][::2] = out[::2, 0][::2]
     UMatrix[2::4,-1] = out[2::4,-1]
 
@@ -310,8 +321,9 @@ def calculate_umatrix_hexa(codebook):
                        [1, 0, 1],
                        [1, 1, 0]])
     out = signal.convolve2d(UMatrix, kernel, boundary='fill', mode='same')
-    count_mat = np.ones_like(UMatrix)
-    count_mat[UMatrix==0]=0
-    out = out / signal.convolve2d(count_mat, kernel, boundary='fill', mode='same')
+    count_mat = filled.astype(float)
+    denom = signal.convolve2d(count_mat, kernel, boundary='fill', mode='same')
+    denom[denom == 0] = 1
+    out = out / denom
     UMatrix[1::2, 0] = out[1::2, 0]
     return UMatrix

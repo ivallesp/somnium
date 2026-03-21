@@ -83,7 +83,7 @@ class SOM:
         """
         if self.model_is_unfitted:
             raise ModelNotTrainedError
-        x_norm = self.normalizer.normalize(x)
+        x_norm = self.normalizer.transform(x)
         index, _ = find_bmu(codebook=self.codebook, input_matrix=x_norm, metric=self.metric)
         return index.astype(int)
 
@@ -102,19 +102,18 @@ class SOM:
         quantization_error = np.mean(np.abs(neuron_values - self.data_norm))
         return quantization_error
 
-    def calculate_topographic_error(self, n_jobs=1):
+    def calculate_topographic_error(self):
         """
         Calculates the topographic error of the model, i.e. the percentage of instances for which the BMU and the
         2nd BMU are not immediate neighbors.
-        :param n_jobs: number of jobs used to find the bmus (int)
         :return: the topographic error (float)
         """
         if self.model_is_unfitted:
             raise ModelNotTrainedError("The codebook of the model has not been initialized, you must call the fit "
                                        "method before calculating the topographic error.")
         metric = self.codebook.lattice.distance_metric
-        bmus1 = find_bmu(self.codebook, self.data_norm, metric=metric, njb=n_jobs, nth=1)[0]
-        bmus2 = find_bmu(self.codebook, self.data_norm, metric=metric, njb=n_jobs, nth=2)[0]
+        bmus1 = find_bmu(self.codebook, self.data_norm, metric=metric, njb=self.n_jobs, nth=1)[0]
+        bmus2 = find_bmu(self.codebook, self.data_norm, metric=metric, njb=self.n_jobs, nth=2)[0]
         neighs = [self.codebook.lattice.are_neighbor_indices(int(x1), int(x2)) for (x1, x2) in zip(bmus1, bmus2)]
         return 1 - np.mean(neighs)
 
@@ -180,7 +179,7 @@ def update_codebook_voronoi(codebook, training_data, bmu, neighborhood, _dlen):
     n_v = p.sum(axis=1).reshape(1, codebook.nnodes)
     # Weight by neighborhood function (allows dividing apples by apples)
     denominator = n_v.dot(neighborhood.T).reshape(codebook.nnodes, 1)
-    new_codebook = np.divide(numerator, denominator)  # Compute the average
+    new_codebook = np.where(denominator != 0, np.divide(numerator, denominator), codebook.matrix)
     return np.around(new_codebook, decimals=6)
 
 
@@ -199,8 +198,8 @@ def _chunk_based_bmu_find(instance, codebook, distance_metric, nth=1):
     dlen = instance.shape[0]
     bmu = np.empty((dlen, 2))
     d = cdist(codebook, instance, metric=distance_metric)
-    bmu[:, 0] = np.argpartition(d, nth, axis=0)[nth - 1]  # BMU index
-    bmu[:, 1] = np.partition(d, nth, axis=0)[nth - 1]  # Distance (without the X contribution)
+    bmu[:, 0] = np.argpartition(d, nth - 1, axis=0)[nth - 1]  # BMU index
+    bmu[:, 1] = np.partition(d, nth - 1, axis=0)[nth - 1]  # Distance
     return bmu
 
 
@@ -219,7 +218,7 @@ def find_bmu(codebook, input_matrix, metric, njb=1, nth=1):
     """
     dlen = input_matrix.shape[0]
     njb = cpu_count() if njb == -1 else njb
-    chunks = list(batching([input_matrix], n=dlen // njb, return_incomplete_batches=True))
+    chunks = list(batching([input_matrix], n=max(1, dlen // njb), return_incomplete_batches=True))
 
     with Pool(njb) as pool:
         bmus = pool.map(lambda chk: _chunk_based_bmu_find(instance=chk,

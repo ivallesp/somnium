@@ -32,6 +32,9 @@ class Normalizer(object):
     def normalize(self, data):
         raise NotImplementedError()
 
+    def transform(self, data):
+        raise NotImplementedError()
+
     def denormalize(self, data):
         raise NotImplementedError()
 
@@ -71,6 +74,9 @@ class StandardNormalizer(Normalizer):
         self.st[self.st == 0] = 1  # prevent: when sd = 0, normalized result = NaN
         return (data-self.me)/self.st
 
+    def transform(self, data):
+        return (data-self.me)/self.st
+
     def denormalize(self, data):
         """
         Undo the normalization with the stored parameters
@@ -104,7 +110,7 @@ class StandardNormalizer(Normalizer):
 class MinMaxNormalizer(Normalizer):
     """
     Min-Max centering and scaling normalization
-    z = \frac{x - min(x)}{max(x)}
+    z = \frac{x - min(x)}{max(x) - min(x)}
     """
     name = 'minmax'
 
@@ -127,7 +133,12 @@ class MinMaxNormalizer(Normalizer):
         :return: normalized data (np.array)
         """
         self.min, self.max = self._min_and_max(data)
-        return (data-self.min)/self.max
+        self.range = self.max - self.min
+        self.range[self.range == 0] = 1
+        return (data-self.min)/self.range
+
+    def transform(self, data):
+        return (data-self.min)/self.range
 
     def denormalize(self, data):
         """
@@ -135,7 +146,7 @@ class MinMaxNormalizer(Normalizer):
         :param data: data to denormalize (np.array)
         :return:
         """
-        return data*self.max + self.min
+        return data*self.range + self.min
 
     def normalize_by(self, raw_data, data):
         """
@@ -145,7 +156,9 @@ class MinMaxNormalizer(Normalizer):
         :return: normalized data (np.array)
         """
         minimum, maximum = self._min_and_max(raw_data)
-        return (data-minimum)/maximum
+        rng = maximum - minimum
+        rng[rng == 0] = 1
+        return (data-minimum)/rng
 
     def denormalize_by(self, raw_data, data):
         """
@@ -155,7 +168,9 @@ class MinMaxNormalizer(Normalizer):
         :return: denormalized data (np.array)
         """
         minimum, maximum = self._min_and_max(raw_data)
-        return data * maximum + minimum
+        rng = maximum - minimum
+        rng[rng == 0] = 1
+        return data * rng + minimum
 
 
 class LogNormalizer(Normalizer):
@@ -171,6 +186,9 @@ class LogNormalizer(Normalizer):
         :param data: data to normalize (np.array)
         :return: normalized data (np.array)
         """
+        return np.log1p(data)
+
+    def transform(self, data):
         return np.log1p(data)
 
     def denormalize(self, data):
@@ -221,6 +239,10 @@ class LogisticNormalizer(Normalizer):
         data = self.stdsc.normalize(data)
         return 1/(1+np.exp(-data))
 
+    def transform(self, data):
+        data = self.stdsc.transform(data)
+        return 1/(1+np.exp(-data))
+
     def denormalize(self, data):
         """
         Undo the normalization with the stored parameters
@@ -253,7 +275,7 @@ class LogisticNormalizer(Normalizer):
         return data
 
 
-class BoxCox:
+class BoxCox(Normalizer):
     """
     Box-Cox function normalization, after a standard normalization.
      x' = \frac{x - mean(x)}{std(x)}
@@ -299,6 +321,11 @@ class BoxCox:
         self.stdnorm = StandardNormalizer()
         data, self.lambdas = self._boxcox(data)
         data = self.stdnorm.normalize(data)
+        return data
+
+    def transform(self, data):
+        data, _ = self._boxcox(data, self.lambdas)
+        data = self.stdnorm.transform(data)
         return data
 
     def denormalize(self, data):

@@ -45,6 +45,7 @@ class GaussianNeighborhood:
         :param dim: number of dimensions in the distance matrix (int)
         :return: distance matrix with the neighborhood function applied (np.array)
         """
+        radius = max(radius, epsilon)
         return np.exp(-(distance_matrix**2)/(2.0*radius**2)).reshape(dim, dim)
 
 
@@ -67,7 +68,7 @@ class BubbleNeighborhood:
         :param dim: number of dimensions in the distance matrix (int)
         :return: distance matrix with the neighborhood function applied (np.array)
         """
-        return np.where(distance_matrix > radius, 0.0, 1.0).reshape(dim, dim) + epsilon
+        return np.where(distance_matrix > radius, epsilon, 1.0).reshape(dim, dim)
 
 
 class CutGaussianNeighborhood:
@@ -89,6 +90,7 @@ class CutGaussianNeighborhood:
         :param dim: number of dimensions in the distance matrix (int)
         :return: distance matrix with the neighborhood function applied (np.array)
         """
+        radius = max(radius, epsilon)
         gaussian = np.exp(-(distance_matrix**2)/(2.0*radius**2)).reshape(dim, dim)
         threshold = np.exp(-(radius**2)/(2.0*radius**2))
         gaussian[gaussian < threshold] = epsilon  # Cut at radius
@@ -113,4 +115,5 @@ class EpanechicovNeighborhood:
         :param dim: number of dimensions in the distance matrix (int)
         :return: distance matrix with the neighborhood function applied (np.array)
         """
+        radius = max(radius, epsilon)
         return np.clip(1 - (distance_matrix/radius) ** 2, epsilon, None).reshape(dim, dim)
