@@ -235,3 +235,21 @@ class TestToroidalTraining(TestCase):
         model = SOM(mapsize=(10, 10), lattice="cylindrical_rect")
         model.fit(data, epochs=10, radiusin=10, radiusfin=3)
         self.assertGreater(model.calculate_quantization_error(), 0)
+
+
+
+class TestLearningRate(TestCase):
+    def test_learning_rate_trains(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(10, 10))
+        model.fit(data, epochs=10, radiusin=10, radiusfin=3, learning_rate=0.5)
+        self.assertGreater(model.calculate_quantization_error(), 0)
+
+    def test_learning_rate_below_1_smooths(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(10, 10), initialization="pca")
+        model.fit(data, epochs=20, radiusin=10, radiusfin=3, learning_rate=0.5)
+        qe = model.calculate_quantization_error()
+        # Should still converge to a reasonable QE
+        self.assertGreater(qe, 0)
+        self.assertLess(qe, 1)
