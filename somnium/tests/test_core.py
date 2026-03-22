@@ -253,3 +253,21 @@ class TestLearningRate(TestCase):
         # Should still converge to a reasonable QE
         self.assertGreater(qe, 0)
         self.assertLess(qe, 1)
+
+
+class TestSubsampleRatio(TestCase):
+    def test_subsample_trains(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(10, 10))
+        model.fit(data, epochs=10, radiusin=10, radiusfin=3, subsample_ratio=0.5)
+        qe = model.calculate_quantization_error()
+        self.assertGreater(qe, 0)
+
+    def test_subsample_with_learning_rate(self):
+        data = np.random.rand(50, 5)
+        model = SOM(mapsize=(10, 10))
+        model.fit(data, epochs=20, radiusin=10, radiusfin=3,
+                  subsample_ratio=0.8, learning_rate=0.5)
+        vr = model.calculate_vacancy_rate()
+        self.assertGreaterEqual(vr, 0)
+        self.assertLessEqual(vr, 1)

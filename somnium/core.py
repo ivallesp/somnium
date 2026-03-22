@@ -76,7 +76,7 @@ class SOM:
         self.distance_matrix = self.codebook.lattice.distances.reshape(self.codebook.nnodes, self.codebook.nnodes)
 
     def fit(self, data, epochs, radiusin, radiusfin, decay="linear",
-            learning_rate=1.0):
+            learning_rate=1.0, subsample_ratio=1.0):
         """
         Runs a set of epochs with the specified parameters and returns the model trained. The this method can be run
         several times in order to perform 'rough' and 'finetune' stages.
@@ -87,6 +87,8 @@ class SOM:
         :param decay: radius decay schedule. 'linear' (default) or 'exponential'. (str)
         :param learning_rate: blending factor for codebook update. 1.0 (default) = full batch
         update. Values < 1.0 blend old and new codebook for smoother updates. (float)
+        :param subsample_ratio: fraction of data to use each epoch. 1.0 (default) = all data.
+        Values < 1.0 randomly subsample each epoch for stochastic training. (float)
         :return: the model trained (SOM)
         """
         data = _check_data(data)
@@ -106,7 +108,8 @@ class SOM:
                              distance_matrix=self.distance_matrix,
                              distance_metric=self.codebook.lattice.distance_metric,
                              n_jobs=self.n_jobs, decay=decay,
-                             learning_rate=learning_rate)
+                             learning_rate=learning_rate,
+                             subsample_ratio=subsample_ratio)
         # Update the bmus at the end
         self.bmu = find_bmu(self.codebook,
                             data_norm,
@@ -194,7 +197,7 @@ class SOM:
 
 
 def train_som(data, codebook, epochs, radiusin, radiusfin, neighborhood_f, distance_matrix, distance_metric, n_jobs,
-              decay="linear", learning_rate=1.0):
+              decay="linear", learning_rate=1.0, subsample_ratio=1.0):
     """
     Takes a model and a data set as input and trains the model, given a set of parameters.
     :param data: input data to train the model (np.array)
@@ -209,6 +212,7 @@ def train_som(data, codebook, epochs, radiusin, radiusfin, neighborhood_f, dista
     :param n_jobs: number of jobs to use to train the model (int)
     :param decay: radius decay schedule. 'linear' or 'exponential'. (str)
     :param learning_rate: blending factor for codebook update. 1.0 = full batch. (float)
+    :param subsample_ratio: fraction of data per epoch. 1.0 = all data. (float)
     :return: bmus for each data instance (np.array
     """
     if decay == "exponential":
@@ -216,14 +220,26 @@ def train_som(data, codebook, epochs, radiusin, radiusfin, neighborhood_f, dista
     else:
         radius = np.linspace(radiusin, radiusfin, epochs)
 
+    n_samples = data.shape[0]
+    use_subsample = subsample_ratio < 1.0
+    subsample_size = max(1, int(n_samples * subsample_ratio))
+
     for i in range(epochs):
+        if use_subsample:
+            idx = np.random.choice(n_samples, subsample_size, replace=False)
+            epoch_data = data[idx]
+        else:
+            epoch_data = data
+
         neighborhood = neighborhood_f.calculate(distance_matrix, radius[i], codebook.nnodes)
-        bmu = find_bmu(codebook, data, metric=distance_metric, njb=n_jobs)
-        new_codebook = update_codebook_voronoi(codebook, data, bmu, neighborhood, data.shape[0])
+        bmu = find_bmu(codebook, epoch_data, metric=distance_metric, njb=n_jobs)
+        new_codebook = update_codebook_voronoi(codebook, epoch_data, bmu, neighborhood, epoch_data.shape[0])
         if learning_rate < 1.0:
             codebook.matrix = learning_rate * new_codebook + (1 - learning_rate) * codebook.matrix
         else:
             codebook.matrix = new_codebook
+
+    bmu = find_bmu(codebook, data, metric=distance_metric, njb=n_jobs)
     return bmu
 
 
