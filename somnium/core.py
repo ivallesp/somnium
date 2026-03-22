@@ -118,14 +118,19 @@ class SOM:
 
         return self
 
-    def fit_auto(self, data, rough_epochs=30, fine_epochs=30, decay="linear"):
+    def fit_auto(self, data, rough_epochs=400, fine_epochs=400):
         """
-        Convenience method that runs a two-phase training: rough phase with large radius followed by
-        a fine-tuning phase with small radius. Radius values are derived from the map size.
+        Convenience method that runs an optimized two-phase training schedule.
+
+        Rough phase uses linear radius decay for uniform topology building.
+        Fine phase uses exponential decay for precise convergence.
+        Dead neuron reseeding is enabled to minimize vacancy rate.
+        Radii are derived from the map size: rough covers ~1/3 of the map
+        diameter down to radius 3, fine goes from 3 down to 1.
+
         :param data: dataset to use to train the model (np.array)
-        :param rough_epochs: number of epochs for the rough phase (int)
-        :param fine_epochs: number of epochs for the fine-tuning phase (int)
-        :param decay: radius decay schedule. 'linear' or 'exponential'. (str)
+        :param rough_epochs: number of epochs for the rough phase (int, default 400)
+        :param fine_epochs: number of epochs for the fine-tuning phase (int, default 400)
         :return: the model trained (SOM)
         """
         data = _check_data(data)
@@ -133,9 +138,13 @@ class SOM:
         data_norm = self.normalizer.normalize(data)
         if self.model_is_unfitted and self._mapsize == "auto":
             self._init_codebook(estimate_mapsize(data_norm), self._lattice, self._distance_metric)
-        max_radius = max(self.codebook.n_rows, self.codebook.n_columns) / 2
-        self.fit(data, rough_epochs, max_radius, max_radius / 4, decay=decay)
-        self.fit(data, fine_epochs, max_radius / 4, 1, decay=decay)
+        max_dim = max(self.codebook.n_rows, self.codebook.n_columns)
+        rough_start = max(max_dim / 3, 4)
+        transition = 3
+        self.fit(data, rough_epochs, rough_start, transition,
+                 decay="linear", reseed_dead_neurons=True)
+        self.fit(data, fine_epochs, transition, 1,
+                 decay="exponential", reseed_dead_neurons=True)
         return self
 
     def predict(self, x):

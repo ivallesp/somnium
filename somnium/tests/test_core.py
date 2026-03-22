@@ -184,7 +184,7 @@ class TestFitAuto(TestCase):
     def test_fit_auto_trains(self):
         data = np.random.rand(200, 5)
         model = SOM(mapsize=(10, 10))
-        model.fit_auto(data)
+        model.fit_auto(data, rough_epochs=10, fine_epochs=10)
         qe = model.calculate_quantization_error()
         te = model.calculate_topographic_error()
         self.assertGreater(qe, 0)
@@ -193,8 +193,26 @@ class TestFitAuto(TestCase):
     def test_fit_auto_with_auto_mapsize(self):
         data = np.random.rand(500, 5)
         model = SOM(mapsize="auto")
-        model.fit_auto(data)
+        model.fit_auto(data, rough_epochs=10, fine_epochs=10)
         self.assertGreater(model.codebook.n_rows, 0)
+
+    def test_fit_auto_uses_reseed(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(10, 10))
+        model.fit_auto(data, rough_epochs=20, fine_epochs=20)
+        vr = model.calculate_vacancy_rate()
+        # Reseeding should keep VR low
+        self.assertLess(vr, 0.15)
+
+    def test_fit_auto_reduces_error(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 8), initialization="pca")
+        model.fit_auto(data, rough_epochs=20, fine_epochs=20)
+        qe = model.calculate_quantization_error()
+        te = model.calculate_topographic_error()
+        # Should achieve reasonable metrics
+        self.assertLess(qe, 0.5)
+        self.assertLess(te, 0.3)
 
 
 class TestVacancyRate(TestCase):
