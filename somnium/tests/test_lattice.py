@@ -192,3 +192,27 @@ class TestCylindricalHexaLattice(TestCase):
         toro_n = sum(toro.are_neighbor_indices(0, j) for j in range(1, 20))
         self.assertGreaterEqual(cyl_n, flat_n)
         self.assertGreaterEqual(toro_n, cyl_n)
+
+
+class TestGetNeighborIndices(TestCase):
+    def test_hexa_corner_has_3_neighbors(self):
+        lattice = LatticeFactory.build("hexa")(n_rows=5, n_cols=6, distance_metric="euclidean")
+        neighbors = lattice.get_neighbor_indices(0)
+        self.assertEqual(len(neighbors), 3)
+
+    def test_hexa_interior_has_6_neighbors(self):
+        lattice = LatticeFactory.build("hexa")(n_rows=5, n_cols=6, distance_metric="euclidean")
+        neighbors = lattice.get_neighbor_indices(13)  # interior node
+        self.assertEqual(len(neighbors), 6)
+
+    def test_rect_corner_has_2_neighbors(self):
+        lattice = LatticeFactory.build("rect")(n_rows=5, n_cols=6, distance_metric="euclidean")
+        neighbors = lattice.get_neighbor_indices(0)
+        self.assertEqual(len(neighbors), 2)
+
+    def test_neighbors_are_symmetric(self):
+        lattice = LatticeFactory.build("hexa")(n_rows=4, n_cols=5, distance_metric="euclidean")
+        for i in range(len(lattice.coordinates)):
+            neighbors = lattice.get_neighbor_indices(i)
+            for j in neighbors:
+                self.assertIn(i, lattice.get_neighbor_indices(j))

@@ -65,6 +65,15 @@ class Lattice:
         u2 = self.coordinates[i2]
         return self.are_neighbors(u1, u2)
 
+    def get_neighbor_indices(self, idx):
+        """
+        Returns the indices of all lattice neighbors of the given unit.
+        :param idx: index of the unit (int)
+        :return: list of neighbor indices (list of int)
+        """
+        n_units = len(self.coordinates)
+        return [j for j in range(n_units) if j != idx and self.are_neighbor_indices(idx, j)]
+
     def compute_distance_matrix(self, distance_metric):
         """
         Given a distance metric, it computes the distance matrix between the lattice planar coordinates.
