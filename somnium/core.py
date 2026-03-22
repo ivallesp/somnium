@@ -14,16 +14,19 @@ from somnium.util import batching
 from somnium.exceptions import ModelNotTrainedError, InvalidValuesInDataSet
 
 
-def estimate_mapsize(data):
+def estimate_mapsize(data, scale=5, max_aspect_ratio=None):
     """
-    Estimates a good map size for the given data using a heuristic: total neurons ≈ 5 * sqrt(N),
+    Estimates a good map size for the given data using a heuristic: total neurons ≈ scale * sqrt(N),
     aspect ratio derived from the ratio of the first two PCA eigenvalues.
     :param data: input data matrix (np.array)
+    :param scale: multiplier for sqrt(N) to control total neurons (float, default 5)
+    :param max_aspect_ratio: if set, caps the aspect ratio to prevent very elongated maps.
+    None (default) = no cap. (float or None)
     :return: (n_rows, n_columns) tuple
     """
     from sklearn.decomposition import PCA
     n_samples = data.shape[0]
-    total_neurons = int(5 * np.sqrt(n_samples))
+    total_neurons = int(scale * np.sqrt(n_samples))
     if data.shape[1] >= 2:
         pca = PCA(n_components=2, svd_solver='randomized')
         pca.fit(data)
@@ -38,7 +41,8 @@ def estimate_mapsize(data):
 
 class SOM:
     def __init__(self, neighborhood="gaussian", normalization="standard", mapsize=(15, 10), lattice="hexa",
-                 distance_metric="euclidean", n_jobs=1, initialization="random"):
+                 distance_metric="euclidean", n_jobs=1, initialization="random",
+                 mapsize_scale=5):
         """
          Principal somnium class, in charge of training the Self Organizing Map.
         :param neighborhood: neighborhood function to use in the planar lattice. Supported functions are: 'gaussian'
@@ -62,6 +66,7 @@ class SOM:
         self._mapsize = mapsize
         self._lattice = lattice
         self._distance_metric = distance_metric
+        self._mapsize_scale = mapsize_scale
         if mapsize != "auto":
             self._init_codebook(mapsize, lattice, distance_metric)
         self.n_jobs = n_jobs
@@ -97,7 +102,7 @@ class SOM:
         _dlen = data_norm.shape[0]
         if self.model_is_unfitted:
             if self._mapsize == "auto":
-                self._init_codebook(estimate_mapsize(data_norm), self._lattice, self._distance_metric)
+                self._init_codebook(estimate_mapsize(data_norm, scale=self._mapsize_scale), self._lattice, self._distance_metric)
             if self.initialization == "pca":
                 self.codebook.pca_linear_initialization(data_norm)
             else:
@@ -124,7 +129,6 @@ class SOM:
 
         Rough phase uses linear radius decay for uniform topology building.
         Fine phase uses exponential decay for precise convergence.
-        Dead neuron reseeding is enabled to minimize vacancy rate.
         Radii are derived from the map size: rough covers ~1/3 of the map
         diameter down to radius 3, fine goes from 3 down to 1.
 
@@ -137,14 +141,14 @@ class SOM:
         # Resolve auto mapsize early so we can derive radii
         data_norm = self.normalizer.normalize(data)
         if self.model_is_unfitted and self._mapsize == "auto":
-            self._init_codebook(estimate_mapsize(data_norm), self._lattice, self._distance_metric)
+            self._init_codebook(estimate_mapsize(data_norm, scale=self._mapsize_scale), self._lattice, self._distance_metric)
         max_dim = max(self.codebook.n_rows, self.codebook.n_columns)
         rough_start = max(max_dim / 3, 4)
         transition = 3
         self.fit(data, rough_epochs, rough_start, transition,
-                 decay="linear", reseed_dead_neurons=True)
+                 decay="linear")
         self.fit(data, fine_epochs, transition, 1,
-                 decay="exponential", reseed_dead_neurons=True)
+                 decay="exponential")
         return self
 
     def predict(self, x):

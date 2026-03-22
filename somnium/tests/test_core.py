@@ -196,14 +196,6 @@ class TestFitAuto(TestCase):
         model.fit_auto(data, rough_epochs=10, fine_epochs=10)
         self.assertGreater(model.codebook.n_rows, 0)
 
-    def test_fit_auto_uses_reseed(self):
-        data = np.random.rand(200, 5)
-        model = SOM(mapsize=(10, 10))
-        model.fit_auto(data, rough_epochs=20, fine_epochs=20)
-        vr = model.calculate_vacancy_rate()
-        # Reseeding should keep VR low
-        self.assertLess(vr, 0.15)
-
     def test_fit_auto_reduces_error(self):
         data = np.random.rand(200, 5)
         model = SOM(mapsize=(8, 8), initialization="pca")
