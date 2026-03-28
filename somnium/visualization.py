@@ -201,6 +201,48 @@ def plot_comp(component_matrix, title, ax, map_shape, colormap, lattice="hexa", 
     return ax, coordinates
 
 
+def plot_label_map(model, labels, colormap=plt.cm.YlOrRd, max_subplot_columns=5, figure_width=20):
+    """
+    Plots per-class proportion heatmaps on the SOM. One subplot per unique label showing,
+    for each neuron, the fraction of its assigned data points that belong to that class.
+    :param model: trained SOM model
+    :param labels: array-like of labels, one per training data point (same order as training data)
+    :param colormap: colormap for the proportion heatmaps (matplotlib colormap)
+    :param max_subplot_columns: max number of subplot columns (int)
+    :param figure_width: width of the figure (int)
+    :return: figure (matplotlib.figure.Figure)
+    """
+    labels = np.asarray(labels)
+    bmu_indices = model.bmu[0].astype(int)
+    unique_labels = sorted(np.unique(labels).tolist())
+    n_rows = model.codebook.n_rows
+    n_cols = model.codebook.n_columns
+    nnodes = model.codebook.nnodes
+
+    # Compute per-neuron proportion for each label
+    proportions = np.zeros((n_rows, n_cols, len(unique_labels)))
+    hits = np.zeros(nnodes)
+    for node in range(nnodes):
+        mask = bmu_indices == node
+        hits[node] = mask.sum()
+        if hits[node] > 0:
+            node_labels = labels[mask]
+            for k, lab in enumerate(unique_labels):
+                proportions[node // n_cols, node % n_cols, k] = (node_labels == lab).sum() / hits[node]
+
+    subplot_cols = min(len(unique_labels), max_subplot_columns)
+    subplot_rows = math.ceil(len(unique_labels) / subplot_cols)
+    subplots_shape = [subplot_rows, subplot_cols]
+    aspect_ratio = n_rows / n_cols
+    comp_width = figure_width / subplot_cols
+    figsize = (figure_width, comp_width * aspect_ratio * subplot_rows)
+    fig = plt.figure(figsize=figsize, dpi=72)
+    titles = [str(lab) for lab in unique_labels]
+    plot_map(proportions, titles=titles, shape=subplots_shape, colormap=colormap,
+             fig=fig, lattice=model.codebook.lattice.name, mode="color")
+    return fig
+
+
 def calculate_bmus_matrix(model):
     """
     Function used to calculate how many times each neuron has been a best matching unit

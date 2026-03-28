@@ -3,9 +3,11 @@ import tempfile
 import os
 import numpy as np
 import random
+from matplotlib import pyplot as plt
 from scipy.spatial.distance import cdist
 
 from somnium.core import SOM, find_bmu, estimate_mapsize
+from somnium.visualization import plot_label_map
 from somnium.exceptions import ModelNotTrainedError, InvalidValuesInDataSet
 
 
@@ -548,3 +550,47 @@ class TestFitOnline(TestCase):
         model.fit(data, epochs=5, radiusin=8, radiusfin=3, collect_history=True)
         model.fit_online(data, epochs=5, radiusin=3, radiusfin=1, collect_history=True)
         self.assertEqual(len(model.history_["quantization_error"]), 10)
+
+
+class TestPlotLabelMap(TestCase):
+    def setUp(self):
+        import matplotlib
+        matplotlib.use("Agg")
+
+    def test_label_map_returns_figure(self):
+        import matplotlib.figure
+        data = np.random.rand(200, 5)
+        labels = np.array(["A", "B"] * 100)
+        model = SOM(mapsize=(8, 8))
+        model.fit(data, epochs=5, radiusin=8, radiusfin=2)
+        fig = plot_label_map(model, labels)
+        self.assertIsInstance(fig, matplotlib.figure.Figure)
+        plt.close(fig)
+
+    def test_label_map_with_int_labels(self):
+        import matplotlib.figure
+        data = np.random.rand(200, 5)
+        labels = np.random.choice([0, 1, 2], size=200)
+        model = SOM(mapsize=(8, 8))
+        model.fit(data, epochs=5, radiusin=8, radiusfin=2)
+        fig = plot_label_map(model, labels)
+        self.assertIsInstance(fig, matplotlib.figure.Figure)
+        plt.close(fig)
+
+    def test_label_map_hexa_and_rect(self):
+        data = np.random.rand(200, 5)
+        labels = np.array(["X", "Y"] * 100)
+        for lattice in ["hexa", "rect"]:
+            model = SOM(mapsize=(6, 6), lattice=lattice)
+            model.fit(data, epochs=5, radiusin=6, radiusfin=2)
+            fig = plot_label_map(model, labels)
+            plt.close(fig)
+
+    def test_label_map_many_labels(self):
+        data = np.random.rand(200, 5)
+        labels = np.random.choice(list("ABCDEFGHIJKLMNO"), size=200)
+        model = SOM(mapsize=(8, 8))
+        model.fit(data, epochs=5, radiusin=8, radiusfin=2)
+        fig = plot_label_map(model, labels)
+        # Should use tab20 for >10 labels
+        plt.close(fig)
