@@ -74,6 +74,23 @@ class Lattice:
         n_units = len(self.coordinates)
         return [j for j in range(n_units) if j != idx and self.are_neighbor_indices(idx, j)]
 
+    @property
+    def neighbor_matrix(self):
+        """
+        Boolean adjacency matrix of shape (nnodes, nnodes) where entry [i, j] is True
+        if neurons i and j are lattice neighbors. Computed once and cached.
+        """
+        if not hasattr(self, '_neighbor_matrix'):
+            n = len(self.coordinates)
+            mat = np.zeros((n, n), dtype=bool)
+            for i in range(n):
+                for j in range(i + 1, n):
+                    if self.are_neighbors(self.coordinates[i], self.coordinates[j]):
+                        mat[i, j] = True
+                        mat[j, i] = True
+            self._neighbor_matrix = mat
+        return self._neighbor_matrix
+
     def compute_distance_matrix(self, distance_metric):
         """
         Given a distance metric, it computes the distance matrix between the lattice planar coordinates.

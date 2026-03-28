@@ -7,6 +7,8 @@ from multiprocessing import cpu_count
 from scipy.sparse import csr_matrix
 from scipy.spatial.distance import cdist
 
+from sklearn.decomposition import PCA
+
 from somnium.codebook import Codebook
 from somnium.normalization import NormalizerFactory
 from somnium.neighborhood import NeighborhoodFactory
@@ -24,7 +26,6 @@ def estimate_mapsize(data, scale=5, max_aspect_ratio=None):
     None (default) = no cap. (float or None)
     :return: (n_rows, n_columns) tuple
     """
-    from sklearn.decomposition import PCA
     n_samples = data.shape[0]
     total_neurons = int(scale * np.sqrt(n_samples))
     if data.shape[1] >= 2:
@@ -210,10 +211,10 @@ class SOM:
             raise ModelNotTrainedError("The codebook of the model has not been initialized, you must call the fit "
                                        "method before calculating the topographic error.")
         metric = self.codebook.lattice.distance_metric
-        bmus1 = find_bmu(self.codebook, self.data_norm, metric=metric, njb=self.n_jobs, nth=1)[0]
-        bmus2 = find_bmu(self.codebook, self.data_norm, metric=metric, njb=self.n_jobs, nth=2)[0]
-        neighs = [self.codebook.lattice.are_neighbor_indices(int(x1), int(x2)) for (x1, x2) in zip(bmus1, bmus2)]
-        return 1 - np.mean(neighs)
+        bmu1, bmu2 = find_bmu_top2(self.codebook, self.data_norm, metric=metric, njb=self.n_jobs)
+        neighbor_matrix = self.codebook.lattice.neighbor_matrix
+        neighs = neighbor_matrix[bmu1[0].astype(int), bmu2[0].astype(int)]
+        return float(1 - np.mean(neighs))
 
 
 def train_som(data, codebook, epochs, radiusin, radiusfin, neighborhood_f, distance_matrix, distance_metric, n_jobs,
@@ -263,17 +264,16 @@ def train_som(data, codebook, epochs, radiusin, radiusfin, neighborhood_f, dista
             codebook.matrix = new_codebook
 
         if collect_history is not None:
-            full_bmu = find_bmu(codebook, data, metric=distance_metric, njb=n_jobs)
+            full_bmu1, full_bmu2 = find_bmu_top2(codebook, data, metric=distance_metric, njb=n_jobs)
             # QE: mean distance from each data point to its BMU
-            neuron_values = codebook.matrix[full_bmu[0].astype(int)]
+            neuron_values = codebook.matrix[full_bmu1[0].astype(int)]
             qe = float(np.mean(np.abs(neuron_values - data)))
             # VR: fraction of neurons with no hits
-            n_active = len(np.unique(full_bmu[0].astype(int)))
+            n_active = len(np.unique(full_bmu1[0].astype(int)))
             vr = float(1 - n_active / codebook.nnodes)
             # TE: fraction of data where 1st and 2nd BMU are not neighbors
-            bmu2 = find_bmu(codebook, data, metric=distance_metric, njb=n_jobs, nth=2)
-            neighs = [lattice.are_neighbor_indices(int(b1), int(b2))
-                      for b1, b2 in zip(full_bmu[0], bmu2[0])]
+            neighbor_matrix = lattice.neighbor_matrix
+            neighs = neighbor_matrix[full_bmu1[0].astype(int), full_bmu2[0].astype(int)]
             te = float(1 - np.mean(neighs))
             collect_history["quantization_error"].append(qe)
             collect_history["topographic_error"].append(te)
@@ -344,6 +344,28 @@ def _chunk_based_bmu_find(instance, codebook, distance_metric, nth=1):
     return bmu
 
 
+def _chunk_based_bmu_find_top2(instance, codebook, distance_metric):
+    """
+    Finds the 1st and 2nd BMU for each instance in a single cdist call.
+    :param instance: batch of instances (list containing one np.array)
+    :param codebook: codebook matrix (np.array)
+    :param distance_metric: distance metric (str)
+    :return: array of shape (dlen, 4): [bmu1_idx, bmu1_dist, bmu2_idx, bmu2_dist]
+    """
+    assert len(instance) == 1
+    instance = instance[0]
+    dlen = instance.shape[0]
+    d = cdist(codebook, instance, metric=distance_metric)
+    top2_idx = np.argpartition(d, 1, axis=0)[:2]
+    top2_dist = np.partition(d, 1, axis=0)[:2]
+    result = np.empty((dlen, 4))
+    result[:, 0] = top2_idx[0]
+    result[:, 1] = top2_dist[0]
+    result[:, 2] = top2_idx[1]
+    result[:, 3] = top2_dist[1]
+    return result
+
+
 def find_bmu(codebook, input_matrix, metric, njb=1, nth=1):
     """
     Finds the best matching unit (bmu) for each input observation from the input matrix. It does all at once
@@ -368,6 +390,29 @@ def find_bmu(codebook, input_matrix, metric, njb=1, nth=1):
                                                           nth=nth), chunks)
     bmus = np.asarray(list(itertools.chain(*bmus))).T
     return bmus
+
+
+def find_bmu_top2(codebook, input_matrix, metric, njb=1):
+    """
+    Finds both the 1st and 2nd best matching units in a single pass (one cdist per chunk).
+    :param codebook: codebook object (somnium.codebook.Codebook)
+    :param input_matrix: input data matrix (np.array)
+    :param metric: distance metric name (str)
+    :param njb: number of parallel jobs (int)
+    :returns: tuple (bmu1, bmu2) where each is a (2, dlen) array of [indices, distances]
+    """
+    dlen = input_matrix.shape[0]
+    njb = cpu_count() if njb == -1 else njb
+    chunks = list(batching([input_matrix], n=max(1, dlen // njb), return_incomplete_batches=True))
+
+    with Pool(njb) as pool:
+        results = pool.map(lambda chk: _chunk_based_bmu_find_top2(
+            instance=chk, codebook=codebook.matrix, distance_metric=metric), chunks)
+    combined = np.vstack(list(itertools.chain(results)))
+    bmu1 = np.array([combined[:, 0], combined[:, 1]])
+    bmu2 = np.array([combined[:, 2], combined[:, 3]])
+    return bmu1, bmu2
+
 
 def _check_data(data):
     if np.isnan(data).any():

@@ -1,6 +1,7 @@
 from unittest import TestCase
 import numpy as np
 import random
+from scipy.spatial.distance import cdist
 
 from somnium.core import SOM, find_bmu, estimate_mapsize
 from somnium.exceptions import ModelNotTrainedError, InvalidValuesInDataSet
@@ -247,7 +248,6 @@ class TestToroidalTraining(TestCase):
         self.assertGreater(model.calculate_quantization_error(), 0)
 
 
-
 class TestLearningRate(TestCase):
     def test_learning_rate_trains(self):
         data = np.random.rand(200, 5)
@@ -334,3 +334,63 @@ class TestCollectHistory(TestCase):
         model.fit(data, epochs=10, radiusin=8, radiusfin=1,
                   decay="exponential", collect_history=True)
         self.assertEqual(len(model.history_["quantization_error"]), 10)
+
+
+class TestTopographicErrorCorrectness(TestCase):
+    def _te_reference(self, model):
+        """Reference TE implementation using the naive per-point Python loop."""
+        metric = model.codebook.lattice.distance_metric
+        d = cdist(model.codebook.matrix, model.data_norm, metric=metric)
+        bmu1 = np.argpartition(d, 0, axis=0)[0]
+        bmu2 = np.argpartition(d, 1, axis=0)[1]
+        lattice = model.codebook.lattice
+        neighs = [lattice.are_neighbor_indices(int(b1), int(b2))
+                  for b1, b2 in zip(bmu1, bmu2)]
+        return 1 - np.mean(neighs)
+
+    def test_te_matches_reference_hexa(self):
+        np.random.seed(123)
+        data = np.random.rand(300, 5)
+        model = SOM(mapsize=(10, 10), lattice="hexa")
+        model.fit(data, epochs=15, radiusin=10, radiusfin=1)
+        te_model = model.calculate_topographic_error()
+        te_ref = self._te_reference(model)
+        self.assertAlmostEqual(te_model, te_ref, places=10)
+
+    def test_te_matches_reference_rect(self):
+        np.random.seed(456)
+        data = np.random.rand(300, 5)
+        model = SOM(mapsize=(10, 10), lattice="rect")
+        model.fit(data, epochs=15, radiusin=10, radiusfin=1)
+        te_model = model.calculate_topographic_error()
+        te_ref = self._te_reference(model)
+        self.assertAlmostEqual(te_model, te_ref, places=10)
+
+    def test_te_matches_reference_toroidal_hexa(self):
+        np.random.seed(789)
+        data = np.random.rand(300, 5)
+        model = SOM(mapsize=(8, 8), lattice="toroidal_hexa")
+        model.fit(data, epochs=15, radiusin=8, radiusfin=1)
+        te_model = model.calculate_topographic_error()
+        te_ref = self._te_reference(model)
+        self.assertAlmostEqual(te_model, te_ref, places=10)
+
+    def test_te_matches_reference_cylindrical_rect(self):
+        np.random.seed(101)
+        data = np.random.rand(300, 5)
+        model = SOM(mapsize=(8, 8), lattice="cylindrical_rect")
+        model.fit(data, epochs=15, radiusin=8, radiusfin=1)
+        te_model = model.calculate_topographic_error()
+        te_ref = self._te_reference(model)
+        self.assertAlmostEqual(te_model, te_ref, places=10)
+
+    def test_te_history_matches_model_te(self):
+        np.random.seed(42)
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 8))
+        model.fit(data, epochs=5, radiusin=8, radiusfin=2, collect_history=True)
+        # Last history TE should match model.calculate_topographic_error()
+        # (both computed on the full data after the last codebook update)
+        te_history_last = model.history_["topographic_error"][-1]
+        te_model = model.calculate_topographic_error()
+        self.assertAlmostEqual(te_history_last, te_model, places=10)
