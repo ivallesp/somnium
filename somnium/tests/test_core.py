@@ -642,3 +642,35 @@ class TestQualityMap(TestCase):
             model.fit(data, epochs=5, radiusin=6, radiusfin=2)
             fig = plot_quality_map(model)
             plt.close(fig)
+
+
+class TestMexicanHatNeighborhood(TestCase):
+    def test_mexican_hat_trains(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 8), neighborhood="mexican_hat")
+        model.fit(data, epochs=10, radiusin=8, radiusfin=2)
+        self.assertGreater(model.calculate_quantization_error(), 0)
+
+    def test_mexican_hat_center_is_one(self):
+        from somnium.neighborhood import MexicanHatNeighborhood
+        d = np.array([0.0, 1.0, 2.0, 3.0])
+        result = MexicanHatNeighborhood.calculate(d, radius=2.0, dim=2)
+        # At distance 0 the value should be 1.0
+        self.assertAlmostEqual(result.flat[0], 1.0)
+
+    def test_mexican_hat_has_negative_surround(self):
+        from somnium.neighborhood import MexicanHatNeighborhood
+        distances = np.linspace(0, 5, 16)
+        result = MexicanHatNeighborhood.calculate(distances, radius=2.0, dim=4)
+        # Should have some negative values (inhibitory zone)
+        self.assertTrue(np.any(result < 0))
+
+    def test_mexican_hat_reduces_error(self):
+        np.random.seed(42)
+        data = np.random.rand(300, 5)
+        model = SOM(mapsize=(8, 8), neighborhood="mexican_hat")
+        model.fit(data, epochs=5, radiusin=8, radiusfin=4)
+        qe_early = model.calculate_quantization_error()
+        model.fit(data, epochs=20, radiusin=4, radiusfin=1)
+        qe_late = model.calculate_quantization_error()
+        self.assertLess(qe_late, qe_early)

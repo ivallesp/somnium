@@ -97,6 +97,29 @@ class CutGaussianNeighborhood:
         return gaussian
 
 
+class MexicanHatNeighborhood:
+    """
+    Mexican hat neighborhood function (difference of Gaussians with inhibitory surround)
+
+    f(x) = (1 - (x/r)^2) * exp(-x^2 / (2*r^2))
+
+    """
+    name = 'mexican_hat'
+
+    @staticmethod
+    def calculate(distance_matrix, radius, dim):
+        """
+        Given a distance matrix, it applies the neighborhood function
+        :param distance_matrix: matrix with the pairwise distances (np.array)
+        :param radius: radius for the neighborhood function (float)
+        :param dim: number of dimensions in the distance matrix (int)
+        :return: distance matrix with the neighborhood function applied (np.array)
+        """
+        radius = max(radius, epsilon)
+        d_norm = distance_matrix / radius
+        return ((1 - d_norm ** 2) * np.exp(-(distance_matrix ** 2) / (2.0 * radius ** 2))).reshape(dim, dim)
+
+
 class EpanechicovNeighborhood:
     """
     Epanechicov neighborhood function
