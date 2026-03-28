@@ -474,3 +474,77 @@ class TestSaveLoad(TestCase):
             self.assertGreater(qe, 0)
         finally:
             os.unlink(path)
+
+
+class TestFitOnline(TestCase):
+    def test_online_reduces_error(self):
+        np.random.seed(42)
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 8))
+        model.fit_online(data, epochs=3, radiusin=8, radiusfin=4)
+        qe_early = model.calculate_quantization_error()
+        model.fit_online(data, epochs=20, radiusin=4, radiusfin=1)
+        qe_late = model.calculate_quantization_error()
+        self.assertLess(qe_late, qe_early)
+
+    def test_online_produces_valid_metrics(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 8))
+        model.fit_online(data, epochs=10, radiusin=8, radiusfin=1)
+        qe = model.calculate_quantization_error()
+        te = model.calculate_topographic_error()
+        vr = model.calculate_vacancy_rate()
+        self.assertGreater(qe, 0)
+        self.assertGreaterEqual(te, 0)
+        self.assertLessEqual(te, 1)
+        self.assertGreaterEqual(vr, 0)
+        self.assertLessEqual(vr, 1)
+
+    def test_online_with_exponential_decay(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 8))
+        model.fit_online(data, epochs=10, radiusin=8, radiusfin=1, decay="exponential")
+        self.assertGreater(model.calculate_quantization_error(), 0)
+
+    def test_online_predict_works(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 8))
+        model.fit_online(data, epochs=10, radiusin=8, radiusfin=1)
+        preds = model.predict(data)
+        self.assertEqual(len(preds), 200)
+        self.assertTrue(np.all(preds >= 0))
+        self.assertTrue(np.all(preds < 64))
+
+    def test_online_with_pca_init(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 8), initialization="pca")
+        model.fit_online(data, epochs=10, radiusin=8, radiusfin=1)
+        self.assertGreater(model.calculate_quantization_error(), 0)
+
+    def test_online_with_auto_mapsize(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize="auto")
+        model.fit_online(data, epochs=5, radiusin=8, radiusfin=1)
+        self.assertGreater(model.codebook.n_rows, 0)
+
+    def test_online_with_rect_lattice(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 8), lattice="rect")
+        model.fit_online(data, epochs=10, radiusin=8, radiusfin=1)
+        self.assertGreater(model.calculate_quantization_error(), 0)
+
+    def test_online_collect_history(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 8))
+        model.fit_online(data, epochs=10, radiusin=8, radiusfin=1, collect_history=True)
+        self.assertTrue(hasattr(model, 'history_'))
+        for key in ("quantization_error", "topographic_error", "vacancy_rate"):
+            self.assertIn(key, model.history_)
+            self.assertEqual(len(model.history_[key]), 10)
+
+    def test_online_history_accumulates_with_batch(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 8))
+        model.fit(data, epochs=5, radiusin=8, radiusfin=3, collect_history=True)
+        model.fit_online(data, epochs=5, radiusin=3, radiusfin=1, collect_history=True)
+        self.assertEqual(len(model.history_["quantization_error"]), 10)

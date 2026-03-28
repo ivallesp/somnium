@@ -181,6 +181,68 @@ class SOM:
                  decay="exponential")
         return self
 
+    def fit_online(self, data, epochs, radiusin, radiusfin, learning_rate_init=0.1,
+                   learning_rate_fin=0.01, decay="linear", collect_history=False):
+        """
+        Online/sequential SOM training: presents one sample at a time and updates the codebook
+        after each sample. Samples are shuffled each epoch.
+        :param data: dataset to use to train the model (np.array)
+        :param epochs: number of full passes over the data (int)
+        :param radiusin: initial neighborhood radius (float)
+        :param radiusfin: final neighborhood radius (float)
+        :param learning_rate_init: initial learning rate (float, default 0.1)
+        :param learning_rate_fin: final learning rate (float, default 0.01)
+        :param decay: decay schedule for both radius and learning rate. 'linear' or 'exponential'. (str)
+        :param collect_history: if True, record per-epoch quantization_error, topographic_error,
+        and vacancy_rate in self.history_ (dict of lists). Appends to existing history if present. (bool)
+        :return: the model trained (SOM)
+        """
+        data = _check_data(data)
+        data_norm = self.normalizer.normalize(data)
+        self.data_norm = data_norm
+        if self.model_is_unfitted:
+            if self._mapsize == "auto":
+                self._init_codebook(estimate_mapsize(data_norm, scale=self._mapsize_scale),
+                                    self._lattice, self._distance_metric)
+            if self.initialization == "pca":
+                self.codebook.pca_linear_initialization(data_norm)
+            else:
+                self.codebook.random_initialization(data_norm)
+            self.model_is_unfitted = False
+        if collect_history and not hasattr(self, 'history_'):
+            self.history_ = {"quantization_error": [], "topographic_error": [], "vacancy_rate": []}
+
+        if decay == "exponential":
+            radius = radiusin * (radiusfin / max(radiusin, 1e-10)) ** (
+                np.arange(epochs) / max(epochs - 1, 1))
+            lr = learning_rate_init * (learning_rate_fin / max(learning_rate_init, 1e-10)) ** (
+                np.arange(epochs) / max(epochs - 1, 1))
+        else:
+            radius = np.linspace(radiusin, radiusfin, epochs)
+            lr = np.linspace(learning_rate_init, learning_rate_fin, epochs)
+
+        distance_metric = self.codebook.lattice.distance_metric
+        n_samples = data_norm.shape[0]
+
+        for i in range(epochs):
+            neighborhood = self.neighborhood_calculator.calculate(
+                self.distance_matrix, radius[i], self.codebook.nnodes)
+            order = np.random.permutation(n_samples)
+            for j in order:
+                x = data_norm[j]
+                distances = cdist(self.codebook.matrix, x.reshape(1, -1),
+                                  metric=distance_metric).ravel()
+                bmu_idx = np.argmin(distances)
+                h = neighborhood[bmu_idx]
+                self.codebook.matrix += lr[i] * h[:, np.newaxis] * (x - self.codebook.matrix)
+            if collect_history:
+                _collect_epoch_metrics(data_norm, self.codebook, distance_metric,
+                                      self.n_jobs, self.codebook.lattice, self.history_)
+
+        self.bmu = find_bmu(self.codebook, data_norm,
+                            metric=distance_metric, njb=self.n_jobs)
+        return self
+
     def predict(self, x):
         """
         Given a new dataset, if the model is trained, this function returns the
@@ -239,6 +301,22 @@ class SOM:
         return float(1 - np.mean(neighs))
 
 
+def _collect_epoch_metrics(data, codebook, distance_metric, n_jobs, lattice, history):
+    """
+    Computes QE, TE, and VR on the full data and appends to the history dict.
+    """
+    bmu1, bmu2 = find_bmu_top2(codebook, data, metric=distance_metric, njb=n_jobs)
+    neuron_values = codebook.matrix[bmu1[0].astype(int)]
+    qe = float(np.mean(np.abs(neuron_values - data)))
+    n_active = len(np.unique(bmu1[0].astype(int)))
+    vr = float(1 - n_active / codebook.nnodes)
+    neighs = lattice.neighbor_matrix[bmu1[0].astype(int), bmu2[0].astype(int)]
+    te = float(1 - np.mean(neighs))
+    history["quantization_error"].append(qe)
+    history["topographic_error"].append(te)
+    history["vacancy_rate"].append(vr)
+
+
 def train_som(data, codebook, epochs, radiusin, radiusfin, neighborhood_f, distance_matrix, distance_metric, n_jobs,
               decay="linear", learning_rate=1.0, subsample_ratio=1.0, collect_history=None, lattice=None):
     """
@@ -286,20 +364,7 @@ def train_som(data, codebook, epochs, radiusin, radiusfin, neighborhood_f, dista
             codebook.matrix = new_codebook
 
         if collect_history is not None:
-            full_bmu1, full_bmu2 = find_bmu_top2(codebook, data, metric=distance_metric, njb=n_jobs)
-            # QE: mean distance from each data point to its BMU
-            neuron_values = codebook.matrix[full_bmu1[0].astype(int)]
-            qe = float(np.mean(np.abs(neuron_values - data)))
-            # VR: fraction of neurons with no hits
-            n_active = len(np.unique(full_bmu1[0].astype(int)))
-            vr = float(1 - n_active / codebook.nnodes)
-            # TE: fraction of data where 1st and 2nd BMU are not neighbors
-            neighbor_matrix = lattice.neighbor_matrix
-            neighs = neighbor_matrix[full_bmu1[0].astype(int), full_bmu2[0].astype(int)]
-            te = float(1 - np.mean(neighs))
-            collect_history["quantization_error"].append(qe)
-            collect_history["topographic_error"].append(te)
-            collect_history["vacancy_rate"].append(vr)
+            _collect_epoch_metrics(data, codebook, distance_metric, n_jobs, lattice, collect_history)
 
     bmu = find_bmu(codebook, data, metric=distance_metric, njb=n_jobs)
     return bmu
