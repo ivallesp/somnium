@@ -1,4 +1,5 @@
 import itertools
+import pickle
 
 import numpy as np
 
@@ -80,6 +81,27 @@ class SOM:
     def _init_codebook(self, mapsize, lattice, distance_metric):
         self.codebook = Codebook(mapsize=mapsize, lattice=lattice, distance_metric=distance_metric)
         self.distance_matrix = self.codebook.lattice.distances.reshape(self.codebook.nnodes, self.codebook.nnodes)
+
+    def save(self, path):
+        """
+        Saves the model to disk using pickle.
+        :param path: file path to save to (str or Path)
+        """
+        with open(path, 'wb') as f:
+            pickle.dump(self, f)
+
+    @classmethod
+    def load(cls, path):
+        """
+        Loads a model from disk.
+        :param path: file path to load from (str or Path)
+        :return: the loaded SOM model
+        """
+        with open(path, 'rb') as f:
+            model = pickle.load(f)
+        if not isinstance(model, cls):
+            raise TypeError(f"Expected a SOM instance, got {type(model).__name__}")
+        return model
 
     def fit(self, data, epochs, radiusin, radiusfin, decay="linear",
             learning_rate=1.0, subsample_ratio=1.0, collect_history=False):

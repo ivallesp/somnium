@@ -1,4 +1,6 @@
 from unittest import TestCase
+import tempfile
+import os
 import numpy as np
 import random
 from scipy.spatial.distance import cdist
@@ -394,3 +396,81 @@ class TestTopographicErrorCorrectness(TestCase):
         te_history_last = model.history_["topographic_error"][-1]
         te_model = model.calculate_topographic_error()
         self.assertAlmostEqual(te_history_last, te_model, places=10)
+
+
+class TestSaveLoad(TestCase):
+    def test_save_load_preserves_predictions(self):
+        np.random.seed(42)
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 8))
+        model.fit(data, epochs=10, radiusin=8, radiusfin=2)
+        preds_before = model.predict(data)
+        with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as f:
+            path = f.name
+        try:
+            model.save(path)
+            loaded = SOM.load(path)
+            preds_after = loaded.predict(data)
+            self.assertTrue(np.array_equal(preds_before, preds_after))
+        finally:
+            os.unlink(path)
+
+    def test_save_load_preserves_metrics(self):
+        np.random.seed(42)
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 8))
+        model.fit(data, epochs=10, radiusin=8, radiusfin=2)
+        qe_before = model.calculate_quantization_error()
+        te_before = model.calculate_topographic_error()
+        vr_before = model.calculate_vacancy_rate()
+        with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as f:
+            path = f.name
+        try:
+            model.save(path)
+            loaded = SOM.load(path)
+            self.assertAlmostEqual(loaded.calculate_quantization_error(), qe_before, places=10)
+            self.assertAlmostEqual(loaded.calculate_topographic_error(), te_before, places=10)
+            self.assertAlmostEqual(loaded.calculate_vacancy_rate(), vr_before, places=10)
+        finally:
+            os.unlink(path)
+
+    def test_save_load_preserves_history(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 8))
+        model.fit(data, epochs=5, radiusin=8, radiusfin=2, collect_history=True)
+        with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as f:
+            path = f.name
+        try:
+            model.save(path)
+            loaded = SOM.load(path)
+            self.assertTrue(hasattr(loaded, 'history_'))
+            for key in ("quantization_error", "topographic_error", "vacancy_rate"):
+                self.assertEqual(loaded.history_[key], model.history_[key])
+        finally:
+            os.unlink(path)
+
+    def test_load_rejects_non_som(self):
+        with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as f:
+            path = f.name
+            import pickle
+            pickle.dump({"not": "a som"}, f)
+        try:
+            self.assertRaises(TypeError, SOM.load, path)
+        finally:
+            os.unlink(path)
+
+    def test_loaded_model_can_continue_training(self):
+        np.random.seed(42)
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 8))
+        model.fit(data, epochs=5, radiusin=8, radiusfin=3)
+        with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as f:
+            path = f.name
+        try:
+            model.save(path)
+            loaded = SOM.load(path)
+            loaded.fit(data, epochs=5, radiusin=3, radiusfin=1)
+            qe = loaded.calculate_quantization_error()
+            self.assertGreater(qe, 0)
+        finally:
+            os.unlink(path)
