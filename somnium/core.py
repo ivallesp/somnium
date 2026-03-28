@@ -81,7 +81,7 @@ class SOM:
         self.distance_matrix = self.codebook.lattice.distances.reshape(self.codebook.nnodes, self.codebook.nnodes)
 
     def fit(self, data, epochs, radiusin, radiusfin, decay="linear",
-            learning_rate=1.0, subsample_ratio=1.0):
+            learning_rate=1.0, subsample_ratio=1.0, collect_history=False):
         """
         Runs a set of epochs with the specified parameters and returns the model trained. The this method can be run
         several times in order to perform 'rough' and 'finetune' stages.
@@ -94,6 +94,9 @@ class SOM:
         update. Values < 1.0 blend old and new codebook for smoother updates. (float)
         :param subsample_ratio: fraction of data to use each epoch. 1.0 (default) = all data.
         Values < 1.0 randomly subsample each epoch for stochastic training. (float)
+        :param collect_history: if True, record per-epoch quantization_error, topographic_error,
+        and vacancy_rate in self.history_ (dict of lists). Appends to existing history if present.
+        Note: this adds overhead since TE requires two full BMU searches per epoch. (bool)
         :return: the model trained (SOM)
         """
         data = _check_data(data)
@@ -108,13 +111,17 @@ class SOM:
             else:
                 self.codebook.random_initialization(data_norm)
             self.model_is_unfitted = False
+        if collect_history and not hasattr(self, 'history_'):
+            self.history_ = {"quantization_error": [], "topographic_error": [], "vacancy_rate": []}
         self.bmu = train_som(data_norm, self.codebook, epochs, radiusin, radiusfin,
                              neighborhood_f=self.neighborhood_calculator,
                              distance_matrix=self.distance_matrix,
                              distance_metric=self.codebook.lattice.distance_metric,
                              n_jobs=self.n_jobs, decay=decay,
                              learning_rate=learning_rate,
-                             subsample_ratio=subsample_ratio)
+                             subsample_ratio=subsample_ratio,
+                             collect_history=self.history_ if collect_history else None,
+                             lattice=self.codebook.lattice)
         # Update the bmus at the end
         self.bmu = find_bmu(self.codebook,
                             data_norm,
@@ -210,7 +217,7 @@ class SOM:
 
 
 def train_som(data, codebook, epochs, radiusin, radiusfin, neighborhood_f, distance_matrix, distance_metric, n_jobs,
-              decay="linear", learning_rate=1.0, subsample_ratio=1.0):
+              decay="linear", learning_rate=1.0, subsample_ratio=1.0, collect_history=None, lattice=None):
     """
     Takes a model and a data set as input and trains the model, given a set of parameters.
     :param data: input data to train the model (np.array)
@@ -226,7 +233,10 @@ def train_som(data, codebook, epochs, radiusin, radiusfin, neighborhood_f, dista
     :param decay: radius decay schedule. 'linear' or 'exponential'. (str)
     :param learning_rate: blending factor for codebook update. 1.0 = full batch. (float)
     :param subsample_ratio: fraction of data per epoch. 1.0 = all data. (float)
-    :return: bmus for each data instance (np.array
+    :param collect_history: if not None, a dict with keys 'quantization_error', 'topographic_error',
+    'vacancy_rate' to which per-epoch values are appended. (dict or None)
+    :param lattice: lattice object, required when collect_history is not None (for TE computation).
+    :return: bmus for each data instance (np.array)
     """
     if decay == "exponential":
         radius = radiusin * (radiusfin / max(radiusin, 1e-10)) ** (np.arange(epochs) / max(epochs - 1, 1))
@@ -251,6 +261,23 @@ def train_som(data, codebook, epochs, radiusin, radiusfin, neighborhood_f, dista
             codebook.matrix = learning_rate * new_codebook + (1 - learning_rate) * codebook.matrix
         else:
             codebook.matrix = new_codebook
+
+        if collect_history is not None:
+            full_bmu = find_bmu(codebook, data, metric=distance_metric, njb=n_jobs)
+            # QE: mean distance from each data point to its BMU
+            neuron_values = codebook.matrix[full_bmu[0].astype(int)]
+            qe = float(np.mean(np.abs(neuron_values - data)))
+            # VR: fraction of neurons with no hits
+            n_active = len(np.unique(full_bmu[0].astype(int)))
+            vr = float(1 - n_active / codebook.nnodes)
+            # TE: fraction of data where 1st and 2nd BMU are not neighbors
+            bmu2 = find_bmu(codebook, data, metric=distance_metric, njb=n_jobs, nth=2)
+            neighs = [lattice.are_neighbor_indices(int(b1), int(b2))
+                      for b1, b2 in zip(full_bmu[0], bmu2[0])]
+            te = float(1 - np.mean(neighs))
+            collect_history["quantization_error"].append(qe)
+            collect_history["topographic_error"].append(te)
+            collect_history["vacancy_rate"].append(vr)
 
     bmu = find_bmu(codebook, data, metric=distance_metric, njb=n_jobs)
     return bmu

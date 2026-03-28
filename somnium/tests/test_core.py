@@ -281,3 +281,56 @@ class TestSubsampleRatio(TestCase):
         vr = model.calculate_vacancy_rate()
         self.assertGreaterEqual(vr, 0)
         self.assertLessEqual(vr, 1)
+
+
+class TestCollectHistory(TestCase):
+    def test_history_has_correct_keys_and_length(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 8))
+        model.fit(data, epochs=10, radiusin=8, radiusfin=2, collect_history=True)
+        self.assertTrue(hasattr(model, 'history_'))
+        for key in ("quantization_error", "topographic_error", "vacancy_rate"):
+            self.assertIn(key, model.history_)
+            self.assertEqual(len(model.history_[key]), 10)
+
+    def test_history_values_are_valid(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 8))
+        model.fit(data, epochs=10, radiusin=8, radiusfin=2, collect_history=True)
+        for qe in model.history_["quantization_error"]:
+            self.assertGreater(qe, 0)
+        for te in model.history_["topographic_error"]:
+            self.assertGreaterEqual(te, 0)
+            self.assertLessEqual(te, 1)
+        for vr in model.history_["vacancy_rate"]:
+            self.assertGreaterEqual(vr, 0)
+            self.assertLessEqual(vr, 1)
+
+    def test_qe_decreases_over_training(self):
+        np.random.seed(42)
+        data = np.random.rand(300, 5)
+        model = SOM(mapsize=(8, 8))
+        model.fit(data, epochs=30, radiusin=8, radiusfin=1, collect_history=True)
+        qe = model.history_["quantization_error"]
+        # First third average should be higher than last third average
+        self.assertGreater(np.mean(qe[:10]), np.mean(qe[-10:]))
+
+    def test_history_accumulates_across_fit_calls(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 8))
+        model.fit(data, epochs=5, radiusin=8, radiusfin=3, collect_history=True)
+        model.fit(data, epochs=5, radiusin=3, radiusfin=1, collect_history=True)
+        self.assertEqual(len(model.history_["quantization_error"]), 10)
+
+    def test_no_history_by_default(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 8))
+        model.fit(data, epochs=5, radiusin=8, radiusfin=2)
+        self.assertFalse(hasattr(model, 'history_'))
+
+    def test_history_with_exponential_decay(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 8))
+        model.fit(data, epochs=10, radiusin=8, radiusfin=1,
+                  decay="exponential", collect_history=True)
+        self.assertEqual(len(model.history_["quantization_error"]), 10)
