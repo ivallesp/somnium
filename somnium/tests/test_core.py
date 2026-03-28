@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 from scipy.spatial.distance import cdist
 
 from somnium.core import SOM, find_bmu, estimate_mapsize
-from somnium.visualization import plot_label_map
+from somnium.visualization import plot_label_map, plot_quality_map, calculate_quality_map
 from somnium.exceptions import ModelNotTrainedError, InvalidValuesInDataSet
 
 
@@ -594,3 +594,51 @@ class TestPlotLabelMap(TestCase):
         fig = plot_label_map(model, labels)
         # Should use tab20 for >10 labels
         plt.close(fig)
+
+
+class TestQualityMap(TestCase):
+    def setUp(self):
+        import matplotlib
+        matplotlib.use("Agg")
+
+    def test_quality_map_returns_correct_shape(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 6))
+        model.fit(data, epochs=10, radiusin=8, radiusfin=2)
+        qm = calculate_quality_map(model)
+        self.assertEqual(qm.shape, (8, 6))
+
+    def test_quality_map_values_nonnegative(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 8))
+        model.fit(data, epochs=10, radiusin=8, radiusfin=2)
+        qm = calculate_quality_map(model)
+        self.assertTrue(np.all(qm >= 0))
+
+    def test_quality_map_active_neurons_positive(self):
+        data = np.random.rand(500, 5)
+        model = SOM(mapsize=(6, 6))
+        model.fit(data, epochs=15, radiusin=6, radiusfin=1)
+        qm = calculate_quality_map(model)
+        bmu_indices = model.bmu[0].astype(int)
+        active = np.unique(bmu_indices)
+        for node in active:
+            r, c = node // 6, node % 6
+            self.assertGreater(qm[r, c], 0)
+
+    def test_plot_quality_map_returns_figure(self):
+        import matplotlib.figure
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 8))
+        model.fit(data, epochs=5, radiusin=8, radiusfin=2)
+        fig = plot_quality_map(model)
+        self.assertIsInstance(fig, matplotlib.figure.Figure)
+        plt.close(fig)
+
+    def test_plot_quality_map_hexa_and_rect(self):
+        data = np.random.rand(200, 5)
+        for lattice in ["hexa", "rect"]:
+            model = SOM(mapsize=(6, 6), lattice=lattice)
+            model.fit(data, epochs=5, radiusin=6, radiusfin=2)
+            fig = plot_quality_map(model)
+            plt.close(fig)

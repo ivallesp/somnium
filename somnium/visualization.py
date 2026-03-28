@@ -243,6 +243,47 @@ def plot_label_map(model, labels, colormap=plt.cm.YlOrRd, max_subplot_columns=5,
     return fig
 
 
+def plot_quality_map(model, colormap=plt.cm.RdYlGn_r, figure_width=20):
+    """
+    Plots the per-neuron quantization error as a heatmap. For each neuron, shows the mean
+    distance to its assigned data points. Neurons with no assigned data are shown as zero.
+    :param model: trained SOM model
+    :param colormap: colormap for the heatmap (matplotlib colormap). Default uses red for
+    high error, green for low.
+    :param figure_width: width of the figure (int)
+    :return: figure (matplotlib.figure.Figure)
+    """
+    qe_map = calculate_quality_map(model)
+    n_rows = model.codebook.n_rows
+    n_cols = model.codebook.n_columns
+    aspect_ratio = n_rows / n_cols
+    figsize = (figure_width, figure_width * aspect_ratio)
+    fig = plt.figure(figsize=figsize, dpi=72)
+    plot_map(qe_map, titles=["Per-neuron QE"], shape=(1, 1), colormap=colormap,
+             fig=fig, lattice=model.codebook.lattice.name, mode="color")
+    return fig
+
+
+def calculate_quality_map(model):
+    """
+    Computes the per-neuron mean quantization error: for each neuron, the average distance
+    to its assigned data points.
+    :param model: trained SOM model
+    :return: quality map of shape (n_rows, n_cols) (np.array)
+    """
+    bmu_indices = model.bmu[0].astype(int)
+    n_rows = model.codebook.n_rows
+    n_cols = model.codebook.n_columns
+    nnodes = model.codebook.nnodes
+    qe_map = np.zeros(nnodes)
+    for node in range(nnodes):
+        mask = bmu_indices == node
+        if mask.any():
+            assigned = model.data_norm[mask]
+            qe_map[node] = np.mean(np.abs(assigned - model.codebook.matrix[node]))
+    return qe_map.reshape(n_rows, n_cols)
+
+
 def calculate_bmus_matrix(model):
     """
     Function used to calculate how many times each neuron has been a best matching unit
