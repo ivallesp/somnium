@@ -1,4 +1,15 @@
-# _Somnium_: flexible Self-Organising Maps implementation
+# _Somnium_: Self-Organising Maps for humans.
+
+> *Explore your data while it sleeps.*
+
+<p align="center">
+  <img src="assets/components.png" alt="SOM planes">
+</p>
+
+<p align="center">
+  <img src="assets/labels.png" width="48%" alt="Label map">
+</p>
+
 
 ## What is it?
 Somnium is a Python library for exploring multi-dimensional datasets using the Self-Organising Map algorithm (aka Kohonen map).
@@ -13,6 +24,20 @@ A _Self-Organising Map_ (_SOM_) is a biologically inspired algorithm that compre
 - Anomaly detection via high quantization error.
 
 ## Installation
+
+Install directly into an existing project:
+
+```bash
+pip install git+https://github.com/ivallesp/somnium.git
+```
+
+Or with uv:
+
+```bash
+uv add git+https://github.com/ivallesp/somnium.git
+```
+
+For development (clone and install in editable mode):
 
 ```bash
 git clone https://github.com/ivallesp/somnium
@@ -37,17 +62,16 @@ model = SOM(
     n_jobs=1,                    # -1 for all cores
 )
 
-# Two-phase training (rough + fine), with optional exponential decay
-model.fit(data, epochs=30, radiusin=20, radiusfin=5, decay="linear")
-model.fit(data, epochs=30, radiusin=5,  radiusfin=1, decay="exponential")
-
-# Or use the convenience method (auto radii from map size)
 model.fit_auto(data)
 
+# For more control, use fit() directly with two phases:
+# model.fit(data, epochs=30, radiusin=20, radiusfin=5, decay="linear")
+# model.fit(data, epochs=30, radiusin=5,  radiusfin=1, decay="exponential")
+
 # Metrics (lower is better for all)
-model.calculate_quantization_error()  # per-feature MAE
-model.calculate_topographic_error()   # fraction with non-adjacent BMUs
-model.calculate_vacancy_rate()        # fraction of unused neurons
+print(f"Quantization error: {model.calculate_quantization_error():.4f}")  # per-feature MAE
+print(f"Topographic error:  {model.calculate_topographic_error():.4f}")   # fraction with non-adjacent BMUs
+print(f"Vacancy rate:       {model.calculate_vacancy_rate():.4f}")        # fraction of unused neurons
 
 # Predict BMUs for new data
 bmus = model.predict(new_data)
@@ -157,5 +181,15 @@ uv run python -m pytest somnium/tests/ -v
 ## Attribution
 This library was built using [SOMPY](https://github.com/sevamoo/SOMPY) as a starting point.
 
+## References
+
+- Kohonen, T. (1982). *Self-organized formation of topologically correct feature maps*. Biological Cybernetics, 43(1), 59-69.
+- Kohonen, T. (2001). *Self-Organizing Maps*. Springer, 3rd edition.
+- Vesanto, J. & Alhoniemi, E. (2000). *Clustering of the Self-Organizing Map*. IEEE Transactions on Neural Networks, 11(3), 586-600.
+- Kiviluoto, K. (1996). *Topology preservation in self-organizing maps*. Proceedings of ICNN'96, 294-299.
+- Venna, J. & Kaski, S. (2006). *Local multidimensional scaling*. Neural Networks, 19(6-7), 889-899.
+- Ultsch, A. & Siemon, H.P. (1990). *Kohonen's Self Organizing Feature Maps for Exploratory Data Analysis*. Proceedings of INNC'90.
+- Bauer, H.U. & Pawelzik, K.R. (1992). *Quantifying the neighborhood preservation of self-organizing feature maps*. IEEE Transactions on Neural Networks, 3(4), 570-579.
+
 ## License
-MIT. See `LICENSE`. Copyright (c) 2019-2026 Iván Vallés Pérez
+MIT. Do whatever you want with it. Fork it, break it, ship it, sell it, print it and frame it. No permission needed, no strings attached. See `LICENSE`. Copyleft (c) 2019-2026 Iván Vallés Pérez
