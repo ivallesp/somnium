@@ -243,6 +243,56 @@ def plot_label_map(model, labels, colormap=plt.cm.YlOrRd, max_subplot_columns=5,
     return fig
 
 
+def plot_neuron_indices(model, figure_width=20):
+    """
+    Plots the map grid with neuron indices labeled on each cell, so users can
+    cross-reference predict() output with map positions.
+    :param model: trained SOM model
+    :param figure_width: width of the figure (int)
+    :return: figure (matplotlib.figure.Figure)
+    """
+    lattice = model.codebook.lattice.name
+    n_rows = model.codebook.n_rows
+    n_cols = model.codebook.n_columns
+
+    if lattice.endswith("hexa"):
+        numsides, rotation = 6, 0
+    else:
+        numsides, rotation = 4, np.pi / 4
+
+    coords = LatticeFactory.build(lattice).generate_lattice(n_rows, n_cols)
+    coords = coords.copy()
+    coords = coords[:, ::-1]
+    coords = coords[np.lexsort([-coords[:, 0], -coords[:, 1]])]
+    coords[:, 1] = -coords[:, 1]
+
+    row_spacing = abs(coords[n_cols, 1] - coords[0, 1])
+    radius = row_spacing * 2 / 3 if lattice.endswith("hexa") else row_spacing / np.sqrt(2)
+
+    # Neuron indices follow row-major order; the coordinate array is flipped for display
+    index_grid = np.arange(n_rows * n_cols).reshape(n_rows, n_cols)
+    index_grid = np.flip(index_grid, axis=0)
+    index_grid = np.flip(index_grid, axis=1)
+    indices_flat = index_grid.reshape(-1)
+
+    aspect_ratio = n_rows / n_cols
+    fig, ax = plt.subplots(figsize=(figure_width, figure_width * aspect_ratio), dpi=72)
+    patches = [RegularPolygon(xy, numVertices=numsides, radius=radius, orientation=rotation)
+               for xy in coords]
+    coll = PatchCollection(patches, facecolor="white", edgecolor="gray", linewidth=0.5)
+    ax.add_collection(coll)
+    fontsize = max(5, figure_width * 72 / n_cols / 6)
+    for xy, idx in zip(coords, indices_flat):
+        ax.text(xy[0], xy[1], str(idx), ha="center", va="center", fontsize=fontsize)
+    ax.set_xlim(coords[:, 0].min() - 1, coords[:, 0].max() + 1)
+    ax.set_ylim(coords[:, 1].min() - 1, coords[:, 1].max() + 1)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    ax.set_title("Neuron Index Map")
+    plt.tight_layout()
+    return fig
+
+
 def plot_quality_map(model, colormap=plt.cm.RdYlGn_r, figure_width=20):
     """
     Plots the per-neuron quantization error as a heatmap. For each neuron, shows the mean

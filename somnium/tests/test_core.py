@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 from scipy.spatial.distance import cdist
 
 from somnium.core import SOM, find_bmu, estimate_mapsize
-from somnium.visualization import plot_label_map, plot_quality_map, calculate_quality_map
+from somnium.visualization import plot_label_map, plot_quality_map, calculate_quality_map, plot_neuron_indices
 from somnium.exceptions import ModelNotTrainedError, InvalidValuesInDataSet
 
 
@@ -674,3 +674,36 @@ class TestMexicanHatNeighborhood(TestCase):
         model.fit(data, epochs=20, radiusin=4, radiusfin=1)
         qe_late = model.calculate_quantization_error()
         self.assertLess(qe_late, qe_early)
+
+
+class TestPlotNeuronIndices(TestCase):
+    def setUp(self):
+        import matplotlib
+        matplotlib.use("Agg")
+
+    def test_returns_figure(self):
+        import matplotlib.figure
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(8, 8))
+        model.fit(data, epochs=5, radiusin=8, radiusfin=2)
+        fig = plot_neuron_indices(model)
+        self.assertIsInstance(fig, matplotlib.figure.Figure)
+        plt.close(fig)
+
+    def test_hexa_and_rect(self):
+        data = np.random.rand(200, 5)
+        for lattice in ["hexa", "rect"]:
+            model = SOM(mapsize=(6, 6), lattice=lattice)
+            model.fit(data, epochs=5, radiusin=6, radiusfin=2)
+            fig = plot_neuron_indices(model)
+            plt.close(fig)
+
+    def test_has_correct_number_of_labels(self):
+        data = np.random.rand(200, 5)
+        model = SOM(mapsize=(5, 4))
+        model.fit(data, epochs=5, radiusin=5, radiusfin=2)
+        fig = plot_neuron_indices(model)
+        ax = fig.axes[0]
+        texts = [t for t in ax.texts]
+        self.assertEqual(len(texts), 5 * 4)
+        plt.close(fig)
